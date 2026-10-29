@@ -301,6 +301,12 @@
   .plaque-label { font-size: 10px; color: var(--ink-dim); letter-spacing: 0.08em; }
   .plaque-num { font-family: 'Mochiy Pop One', sans-serif; font-size: 30px; color: var(--gold); line-height: 1; }
   .banner-foot { font-size: 10.5px; color: var(--ink-dim); margin-top: 8px; }
+  .season-row { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .season-chip { display: inline-flex; align-items: baseline; gap: 5px; padding: 4px 8px; border-radius: 8px;
+                 font-family: 'Mochiy Pop One', sans-serif; font-size: 13px; color: var(--gold);
+                 background: rgba(6,16,40,0.45); border: 1px solid rgba(120,170,240,0.3); }
+  .season-chip i, .season-chip small { font-family: 'M PLUS Rounded 1c', sans-serif; font-style: normal;
+                 font-size: 9.5px; font-weight: 800; color: var(--ink-dim); }
 
   /* ---- 数値タイル ---- */
   .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-bottom: 8px; }
@@ -1467,10 +1473,10 @@ function drawPlayer() {
       ${shieldHtml(p.leagueNumber, "banner-shield")}
       <div class="banner-league">${esc(leagueName(p.leagueNumber))}</div>
       ${useRate
-        ? `<div class="plaque"><span class="plaque-label">レート</span><span class="plaque-num">${esc(p.rating)}</span></div>
-           ${p.bestRating != null ? `<div class="banner-foot">自己最高 ${esc(p.bestRating)}</div>` : ""}`
+        ? `<div class="plaque"><span class="plaque-label">レート</span><span class="plaque-num">${esc(p.rating)}</span></div>`
         : `<div class="plaque"><span class="plaque-label">トロフィー</span><span class="plaque-num">${esc(p.trophies ?? "—")}</span></div>
-           <div class="banner-foot">天界に乗るとレートが出ます</div>`}
+           ${peakRate(p) ? "" : `<div class="banner-foot">天界に乗るとレートが出ます</div>`}`}
+      ${pastSeasons(p)}
     </div>
 
     <div class="tiles">
@@ -1543,6 +1549,25 @@ function drawPlayer() {
 }
 
 let shelfOpen = false;
+
+// 到達したレートの最高(順位に関係なく)。今のシーズン・前シーズン・最高シーズン・これまでの記録から
+function peakRate(p) {
+  const xs = [p.records?.rating, p.bestRating, p.lastRating, p.rawLeagueNumber === TENKAI ? p.rawRating : null]
+    .filter(v => typeof v === "number" && v > 0);
+  return xs.length ? Math.max(...xs) : null;
+}
+
+// 前シーズンと最高シーズンのレート・世界順位。順位が付いていなくても(圏外)レートは出す
+function pastSeasons(p) {
+  const peak = peakRate(p);
+  const rank = (r) => typeof r === "number" && r > 0 ? `世界${r.toLocaleString()}位` : "順位なし";
+  const row = (label, rate, r) => typeof rate === "number" && rate > 0
+    ? `<span class="season-chip"><i>${label}</i>${esc(rate)}<small>${esc(rank(r))}</small></span>` : "";
+  const chips = row("前シーズン", p.lastRating, p.lastRank) + row("最高シーズン", p.bestRating, p.bestRank);
+  if (!peak && !chips) return "";
+  return `${peak ? `<div class="banner-foot">到達レート最高 <b style="color:var(--gold-lite)">${esc(peak)}</b></div>` : ""}
+    ${chips ? `<div class="season-row">${chips}</div>` : ""}`;
+}
 
 function bindAccSwitch() {
   $main.querySelectorAll("[data-acc]").forEach(b => { b.onclick = () => openPlayer(b.dataset.acc); });

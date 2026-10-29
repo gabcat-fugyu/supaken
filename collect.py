@@ -691,6 +691,7 @@ def collect_player(tag: str, label, groups, token: str, probe: bool = False):
         "lastRating": last_pol.get("trophies"),
         "bestRank": best_pol.get("rank"),
         "lastRank": last_pol.get("rank"),
+        "lastLeagueNumber": last_pol.get("leagueNumber"),
         # 通常トロフィー
         "trophies": player.get("trophies"),
         "bestTrophies": player.get("bestTrophies"),
