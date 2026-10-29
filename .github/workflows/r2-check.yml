@@ -1,6 +1,6 @@
-name: R2の接続確認
+name: 接続確認
 
-# R2の合鍵が正しく登録できているかを確かめる。確認できたら消してよい。
+# R2とクラロワAPIの合鍵が正しく登録できているかを確かめる。確認できたら消してよい。
 on:
   workflow_dispatch:
   push:
@@ -39,4 +39,21 @@ jobs:
           body = s3.get_object(Bucket="supaken-data", Key="_check.txt")["Body"].read().decode()
           print("読み出し:", body)
           print("中身:", [o["Key"] for o in s3.list_objects_v2(Bucket="supaken-data").get("Contents", [])])
+          PY
+      - name: クラロワAPI
+        env:
+          CR_API_TOKEN: ${{ secrets.CR_API_TOKEN }}
+        run: |
+          python - <<'PY'
+          import os, json, urllib.request, urllib.error
+          tok = os.environ.get("CR_API_TOKEN", "").strip()
+          print("CR_API_TOKEN", "OK" if tok else "未登録")
+          req = urllib.request.Request("https://proxy.royaleapi.dev/v1/players/%23C22R8GLC", headers={
+              "Authorization": f"Bearer {tok}", "Accept": "application/json",
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"})
+          try:
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  print("取得できた:", json.loads(r.read())["name"])
+          except urllib.error.HTTPError as e:
+              print("失敗:", e.code, e.read()[:300]); raise SystemExit(1)
           PY
