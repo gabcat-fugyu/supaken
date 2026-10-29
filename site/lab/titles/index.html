@@ -32,7 +32,8 @@
   }
   .panel input:focus, .panel select:focus { outline: none; border-color: var(--gold); }
   .row2 { display: grid; grid-template-columns: 1fr 96px; gap: 8px; }
-  .designs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+  .designs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+  .design-btn .bz { --h: 13px; font-size: 8px; }
   .design-group { margin: 10px 0 5px; font-size: 10.5px; font-weight: 800; color: var(--gold-lite); }
   .design-group:first-child { margin-top: 0; }
   .design-btn {
@@ -76,6 +77,7 @@
   .plate-titles { display: flex; align-items: center; gap: 4px; margin: 0 0 3px; min-width: 0; }
   .plate-titles .ttl { height: 17px; font-size: 9px; }
   .plate-titles .ttl svg { width: 11px; height: 11px; }
+  .plate-titles .bz { --h: 17px; font-size: 9px; }
   .t-more {
     flex-shrink: 0; font-size: 9px; font-weight: 800; line-height: 1; padding: 3px 5px; border-radius: 5px;
     color: var(--ink-dim); background: rgba(6,16,40,0.55); border: 1px solid rgba(120,170,240,0.35);
@@ -167,7 +169,7 @@ let people = [
 ];
 // 上と下に1つずつ付けられる
 const slots = {
-  top:    { on: true, label: "スパーキー日本最速20勝", sub: "JAPAN FASTEST", year: "2026", design: "zap", shape: "point" },
+  top:    { on: true, label: "スパーキー日本最速20勝", sub: "JAPAN FASTEST", year: "2026", design: "zap", shape: "blaze" },
   bottom: { on: true, label: "スパ研", sub: "", year: "", design: "rare", shape: "rect" },
 };
 let editing = "top";

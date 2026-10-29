@@ -1,7 +1,7 @@
 /* 称号の見た目。メン限ページと称号ラボで共通に使う(札は titles.js の Titles.html が作る)。
  *
  *   デザイン … 色・縁・模様・動き(ttl-<デザイン名>)
- *   形      … 角丸(ふつう) / 両端とがり / 角カット / リボン(shape-<形>)
+ *   形      … 角丸(ふつう) / 両端とがり / 角カット / リボン / 剣(shape-<形>)、炎の枠(.bz、絵を使う)
  *   大きさ  … 順位表の小さい札 / プレイヤーページの大きい札(big)
  *
  * デザインはすべて同じ変数で色を決める。
@@ -270,34 +270,78 @@
                    calc(100% - var(--pt)) 100%, 70% 100%, 68% 88%, 32% 88%, 30% 100%, var(--pt) 100%, 0 50%);
 }
 
-/* 右端が炎(左は尖り、右は炎の舌がゆらめく)
-   右の端だけ炎の形の絵(SVG)で型抜きする。炎の絵を3枚切り替えて揺らす */
-.shape-flame {
-  --fw: 30px;   /* 炎の部分の幅 */
-  --shape: polygon(var(--pt) 0, 100% 0, 100% 100%, var(--pt) 100%, 0 50%);
-  --f1: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 100' preserveAspectRatio='none'><path d='M0 0C9 0 12 5 19 1C16 9 23 13 37 6C29 18 24 24 33 30C23 32 21 39 40 47C25 51 23 57 31 65C21 65 19 73 35 85C21 83 15 91 18 100L0 100Z'/></svg>");
-  --f2: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 100' preserveAspectRatio='none'><path d='M0 0C8 0 14 7 22 3C18 12 26 16 39 12C29 22 25 27 34 35C24 36 22 42 38 52C24 54 23 61 33 70C22 69 18 78 32 90C19 87 14 94 16 100L0 100Z'/></svg>");
-  --f3: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 100' preserveAspectRatio='none'><path d='M0 0C10 0 11 4 17 0C15 7 21 10 35 3C28 15 23 21 31 27C22 30 20 36 39 42C26 47 24 54 34 61C23 62 20 70 38 81C23 80 16 88 20 100L0 100Z'/></svg>");
-  padding-right: calc(var(--fw) + 6px) !important;
-  -webkit-mask: linear-gradient(#000, #000) left / calc(100% - var(--fw) + 1px) 100% no-repeat,
-                var(--f1) right / var(--fw) 100% no-repeat;
-          mask: linear-gradient(#000, #000) left / calc(100% - var(--fw) + 1px) 100% no-repeat,
-                var(--f1) right / var(--fw) 100% no-repeat;
-  animation: ttl-spin var(--spin) linear infinite, ttl-burn 0.75s steps(1) infinite;
+/* ==================== 炎の枠(絵を使う札) ====================
+   左の飾り・まん中の棒・右の炎の3枚の絵を並べる。札の高さ=棒の太さで、
+   炎や飾りは札の外まではみ出す(並びの幅には炎のぶんも入る)。
+   色はデザインごとに絵の色相を回して変える(--bz-f)。 */
+.bz {
+  --h: 20px;                     /* 棒の太さ */
+  --s: calc(var(--h) / 113);     /* 絵の1ドットの大きさ */
+  --bz-f: none; --bz-glow: #b46bff;
+  position: relative; display: inline-flex; align-items: center; flex-shrink: 0;
+  height: var(--h); vertical-align: middle;
+  min-width: calc(var(--s) * 785);
+  padding: 0 calc(var(--s) * 372) 0 calc(var(--s) * 96);
+  font-family: 'Mochiy Pop One', sans-serif; font-size: 10px; line-height: 1; white-space: nowrap;
+  color: #fff; isolation: isolate; filter: var(--bz-f);
 }
-.shape-flame .ttl-bg {
-  background:
-    radial-gradient(60% 130% at 100% 50%, var(--glow), transparent 72%),
-    var(--pattern), linear-gradient(180deg, var(--bg1), var(--bg2));
-  -webkit-mask: inherit; mask: inherit;
-  animation: ttl-burn 0.75s steps(1) infinite;
+.bz > i { position: absolute; top: calc(var(--s) * -127); height: calc(var(--s) * 360);
+          background: no-repeat center / 100% 100%; pointer-events: none; z-index: -1; }
+.bz .bz-l { left: 0; width: calc(var(--s) * 293); background-image: url(/assets/skins/blaze-left.webp); }
+.bz .bz-m { left: calc(var(--s) * 293 - 1px); right: calc(var(--s) * 492 - 1px); background-image: url(/assets/skins/blaze-mid.webp); }
+.bz .bz-r { right: 0; width: calc(var(--s) * 492); background-image: url(/assets/skins/blaze-right.webp);
+            transform-origin: 20% 50%; animation: bz-burn 1.6s ease-in-out infinite; }
+/* 炎のうしろの光 */
+.bz .bz-g { right: calc(var(--s) * 40); width: calc(var(--s) * 330); z-index: -2;
+            background: radial-gradient(closest-side, color-mix(in srgb, var(--bz-glow) 55%, transparent), transparent);
+            animation: bz-glow 1.6s ease-in-out infinite; }
+/* 舞い上がる火の粉 */
+.bz .bz-e { right: calc(var(--s) * 60); width: calc(var(--s) * 300); z-index: 1;
+            background:
+              radial-gradient(circle, #fff 0 1px, transparent 1.6px) 20% 70% / 30% 40% no-repeat,
+              radial-gradient(circle, #f0d8ff 0 1.2px, transparent 2px) 60% 60% / 30% 40% no-repeat,
+              radial-gradient(circle, #e2b8ff 0 0.9px, transparent 1.5px) 85% 75% / 30% 40% no-repeat;
+            animation: bz-ember 2.4s linear infinite; }
+.bz .bz-e2 { animation-delay: -1.2s; right: calc(var(--s) * 120); }
+/* 棒の上を走る光 */
+.bz .bz-sh { top: 0; height: 100%; left: calc(var(--s) * 90); right: calc(var(--s) * 300); z-index: 0; overflow: hidden;
+             background: linear-gradient(100deg, transparent 40%, rgba(255,255,255,0.28) 50%, transparent 60%) no-repeat;
+             background-size: 50% 100%; animation: bz-sheen 4.5s ease-in-out infinite; }
+.bz-text { position: relative; z-index: 1; display: inline-flex; flex-direction: column; justify-content: center; gap: 3px; }
+.bz b { font-weight: normal; color: #fff;
+        text-shadow: 0 0 4px var(--bz-glow), 0 0 8px var(--bz-glow), 0 1px 0 rgba(0,0,0,0.8); }
+.bz .ttl-sub { display: none; }
+@keyframes bz-burn {
+  0%, 100% { transform: scale(1, 1) skewY(0deg); filter: brightness(1); }
+  30%      { transform: scale(1.03, 1.06) skewY(-1.5deg); filter: brightness(1.15); }
+  60%      { transform: scale(0.99, 0.97) skewY(1deg); filter: brightness(0.95); }
 }
-@keyframes ttl-burn {
-  0%   { -webkit-mask-image: linear-gradient(#000, #000), var(--f1); mask-image: linear-gradient(#000, #000), var(--f1); }
-  33%  { -webkit-mask-image: linear-gradient(#000, #000), var(--f2); mask-image: linear-gradient(#000, #000), var(--f2); }
-  66%  { -webkit-mask-image: linear-gradient(#000, #000), var(--f3); mask-image: linear-gradient(#000, #000), var(--f3); }
+@keyframes bz-glow { 0%, 100% { opacity: 0.7; } 40% { opacity: 1; } }
+@keyframes bz-ember {
+  0%   { transform: translate(0, 10%); opacity: 0; }
+  20%  { opacity: 1; }
+  100% { transform: translate(8%, -45%); opacity: 0; }
 }
-.ttl.big.shape-flame { --fw: 64px; }
+@keyframes bz-sheen { 0%, 55% { background-position: -60% 0; } 100% { background-position: 220% 0; } }
+
+/* 大きい札(プレイヤーページ) */
+.bz.big { --h: 40px; font-size: 15px; }
+.bz.big .ttl-sub { display: block; font-size: 8.5px; letter-spacing: 0.22em; color: #eadcff;
+                   text-shadow: 0 0 6px var(--bz-glow); }
+
+/* 色(デザインごとに絵の色相を回す) */
+.bz-zap, .bz-super, .bz-abyss, .bz-cosmos { --bz-f: none; }
+.bz-flame    { --bz-f: hue-rotate(95deg) saturate(1.3);  --bz-glow: #b46bff; }
+.bz-sunset, .bz-rare { --bz-f: hue-rotate(120deg) saturate(1.4); }
+.bz-champion { --bz-f: grayscale(1) sepia(1) saturate(3.5) hue-rotate(5deg) brightness(1.3) contrast(1.1); }
+.bz-thunder  { --bz-f: grayscale(1) sepia(1) saturate(5) hue-rotate(15deg) brightness(1.25); }
+.bz-emerald  { --bz-f: hue-rotate(-125deg) saturate(1.1); }
+.bz-ice, .bz-diamond { --bz-f: hue-rotate(-55deg) saturate(1.1) brightness(1.1); }
+.bz-sakura   { --bz-f: hue-rotate(55deg) saturate(0.9) brightness(1.15); }
+.bz-platinum { --bz-f: saturate(0.15) brightness(1.25); }
+.bz-normal, .bz-std { --bz-f: saturate(0.1) brightness(1.05); }
+.bz-rainbow  { animation: bz-hue 6s linear infinite; }
+@keyframes bz-hue { from { filter: hue-rotate(0deg) saturate(1.3); } to { filter: hue-rotate(360deg) saturate(1.3); } }
 
 /* ==================== 大きい札(プレイヤーページ) ==================== */
 .ttl.big {
@@ -318,4 +362,5 @@
 @media (prefers-reduced-motion: reduce) {
   .ttl, .ttl svg, .ttl b, .ttl::before, .ttl-bg { animation: none !important; }
   .ttl::after { display: none; }
+  .bz, .bz > i { animation: none !important; }
 }

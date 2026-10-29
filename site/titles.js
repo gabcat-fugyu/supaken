@@ -40,6 +40,7 @@ window.Titles = (function () {
     { id: "std",      name: "標準(自動)",   group: "auto",    rank: 3, icon: "star" },
   ];
   const ALIASES = { gold: "champion" };   // 昔の名前
+  const SHAPE_ALIASES = { flame: "blaze" };
 
   const SHAPES = [
     { id: "rect",   name: "角丸" },
@@ -47,7 +48,7 @@ window.Titles = (function () {
     { id: "notch",  name: "角カット" },
     { id: "ribbon", name: "リボン" },
     { id: "blade",  name: "剣" },
-    { id: "flame",  name: "右端が炎" },
+    { id: "blaze",  name: "炎の枠" },
   ];
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
@@ -58,7 +59,16 @@ window.Titles = (function () {
     const d = DESIGNS.find((x) => x.id === id) || DESIGNS[0];
     const icon = ICONS[t.icon] || ICONS[d.icon];
     const subText = [t.sub, t.year].filter(Boolean).join(" · ");
-    const shape = SHAPES.some((x) => x.id === t.shape) ? t.shape : "rect";
+    const sh = SHAPE_ALIASES[t.shape] || t.shape;
+    const shape = SHAPES.some((x) => x.id === sh) ? sh : "rect";
+    if (shape === "blaze") {
+      // 炎の枠: 絵を3枚並べる。左の飾りに宝石があるのでアイコンは付けない
+      return `<span class="bz bz-${d.id}${opts.big ? " big" : ""}" title="${esc(t.label)}">` +
+        `<i class="bz-g"></i><i class="bz-l"></i><i class="bz-m"></i><i class="bz-r"></i>` +
+        `<i class="bz-sh"></i><i class="bz-e"></i><i class="bz-e bz-e2"></i>` +
+        `<span class="bz-text">${subText ? `<span class="ttl-sub">${esc(subText)}</span>` : ""}` +
+        `<b>${esc(t.label)}</b></span></span>`;
+    }
     const shaped = shape !== "rect";
     const inner =
       `<span class="ttl ttl-${d.id}${shaped ? ` shp shape-${shape}` : ""}${opts.big ? " big" : ""}" title="${esc(t.label)}">` +
