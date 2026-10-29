@@ -1549,7 +1549,7 @@ $refresh.onclick = () => {
 // 起動。ログインしていればそのまま、していなければログイン画面
 (async () => {
   const reason = new URLSearchParams(location.search).get("login");
-  if (reason) history.replaceState(null, "", location.pathname);   // アドレスの ?login=… を消す
+  if (reason) window.history.replaceState(null, "", location.pathname);   // アドレスの ?login=… を消す
   try { currentUser = await api("/api/me"); enterApp(); }
   catch { showAuth(reason); }
 })();
