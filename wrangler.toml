@@ -2,7 +2,7 @@
 name = "supaken-member"
 main = "worker/member.js"
 compatibility_date = "2025-09-01"
-workers_dev = true
+workers_dev = false
 
 # 画面のファイル(HTML・画像など)
 [assets]
