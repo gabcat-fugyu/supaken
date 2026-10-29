@@ -25,6 +25,9 @@ database_id = "__D1_ID__"
 [vars]
 # 管理人のタグ(カンマ区切り)。称号の付与などができる
 ADMIN_TAGS = ""
+# Discord でログインするときの判定。このサーバーでこのロールを持っている人がメン限ページに入れる
+DISCORD_GUILD_ID = "1418622264542236697"
+DISCORD_MEMBER_ROLE_ID = "1525382489558745209"
 
 [[routes]]
 pattern = "member.supaken.com"
