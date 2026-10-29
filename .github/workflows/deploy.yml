@@ -27,12 +27,33 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CR_API_TOKEN: ${{ secrets.CR_API_TOKEN }}
+          CI: "true"
         run: |
           set +e
-          npx --yes wrangler@4 deploy 2>&1 | tee deploy.log
-          status=${PIPESTATUS[0]}
-          if [ "$status" != "0" ]; then
-            # ログ画面を開かなくても原因が分かるよう、最後の部分をエラー表示に出す
-            echo "::error title=wrangler deploy::$(tail -c 1800 deploy.log | tr '\n' ' ' | sed 's/\x1b\[[0-9;]*m//g')"
-          fi
-          exit $status
+          # 失敗したら、ログ画面を開かなくても原因が分かるようにエラー表示に出す
+          step() {
+            echo "=== $1"; shift
+            "$@" > step.log 2>&1; status=$?
+            cat step.log
+            if [ "$status" != "0" ]; then
+              echo "::error title=$1::$(tail -c 1800 step.log | tr '\n' ' ' | sed 's/\x1b\[[0-9;]*m//g')"
+              exit $status
+            fi
+          }
+          W="npx --yes wrangler@4"
+
+          # ログイン用のデータベース(D1)。無ければ作り、id を wrangler.toml に入れる
+          d1id() { $W d1 list --json 2>/dev/null | python3 -c "import json,sys
+          for x in json.load(sys.stdin):
+              if x.get('name') == 'supaken': print(x.get('uuid') or x.get('id')); break"; }
+          id=$(d1id)
+          if [ -z "$id" ]; then step "D1を作成" $W d1 create supaken; id=$(d1id); fi
+          [ -n "$id" ] || { echo "::error title=D1::データベースの id が取れません"; exit 1; }
+          sed -i "s/__D1_ID__/$id/" wrangler.toml
+          step "表を用意" $W d1 execute supaken --remote --file schema.sql
+
+          step "公開" $W deploy
+          echo "$CR_API_TOKEN" > token.txt
+          step "クラロワAPIのトークンを登録" sh -c "$W secret put CR_API_TOKEN < token.txt"
+          rm -f token.txt

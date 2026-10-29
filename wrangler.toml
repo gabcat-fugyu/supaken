@@ -16,6 +16,16 @@ run_worker_first = ["/api/*"]
 binding = "DATA"
 bucket_name = "supaken-data"
 
+# ログイン用のデータベース。database_id は公開のときに自動で埋める(deploy.yml)
+[[d1_databases]]
+binding = "DB"
+database_name = "supaken"
+database_id = "__D1_ID__"
+
+[vars]
+# 管理人のタグ(カンマ区切り)。称号の付与などができる
+ADMIN_TAGS = ""
+
 [[routes]]
 pattern = "member.supaken.com"
 custom_domain = true

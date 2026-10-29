@@ -26,22 +26,27 @@ jobs:
               except Exception as e:
                   return None, None, str(e).encode()
           out = []
+          def post(url, body):
+              req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST",
+                  headers={"User-Agent": "Mozilla/5.0 supaken-check", "content-type": "application/json"})
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as r:
+                      return r.status, r.read()
+              except urllib.error.HTTPError as e:
+                  return e.code, e.read()
           for attempt in range(6):
               st, ct, body = get("https://member.supaken.com/")
               if st == 200: break
               time.sleep(20)
-          out.append(f"トップ: {st} {ct} {len(body)}バイト title={'CLASH BATTLE LOG' in body.decode('utf-8','ignore')}")
-          st, ct, body = get("https://member.supaken.com/api/data/index.json")
-          if st == 200:
-              d = json.loads(body)
-              out.append(f"index.json: {st} 更新 {d.get('updatedAt')} / {len(d.get('players', []))}人")
-              tag = d["players"][0]["tag"].lstrip("#")
-              st2, _, b2 = get(f"https://member.supaken.com/api/data/{tag}/recent.json")
-              out.append(f"{tag}/recent.json: {st2} {len(b2)}バイト")
-          else:
-              out.append(f"index.json: {st} {body[:200]!r}")
-          st, _, body = get("https://member.supaken.com/assets/icon-192.png")
-          out.append(f"画像: {st} {len(body)}バイト")
+          html = body.decode("utf-8", "ignore")
+          out.append(f"トップ: {st} {len(body)}バイト ログイン画面入り={'showAuth' in html}")
+          B = "https://member.supaken.com"
+          st, _, b = get(B + "/api/me"); out.append(f"未ログインの /api/me: {st} {b[:80].decode('utf-8','ignore')}")
+          st, _, b = get(B + "/api/data/index.json"); out.append(f"未ログインのデータ: {st} {b[:80].decode('utf-8','ignore')}")
+          st, b = post(B + "/api/login", {"tag": "#PRRRPLQGR", "password": "wrong-password"}); out.append(f"違うパスワード: {st} {b[:80].decode('utf-8','ignore')}")
+          st, b = post(B + "/api/register/start", {"tag": "#AAAAAAAA"}); out.append(f"名簿にないタグ: {st} {b[:80].decode('utf-8','ignore')}")
+          st, b = post(B + "/api/register/start", {"tag": "#PRRRPLQGR"}); out.append(f"名簿にあるタグの本人確認: {st} {b[:160].decode('utf-8','ignore')}")
+          st, _, b = get(B + "/assets/icon-192.png"); out.append(f"画像: {st} {len(b)}バイト")
           for line in out:
               print(line)
               print(f"::notice title=確認::{line}")
