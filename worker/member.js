@@ -327,17 +327,19 @@ const grantItem = (g) => ({
   design: g.design, shape: g.shape || "", rarity: "unique", at: g.granted_at,
 });
 
-async function ownedTitles(env, id) {
+// accounts を渡せば、アカウントの読み直しを省く。R2 と D1 は同時に読む
+async function ownedTitles(env, id, accounts) {
+  const accs = accounts || await myAccounts(env, id);
+  const [players, grants] = await Promise.all([
+    Promise.all(accs.map(async (a) => {
+      const obj = await env.DATA.get(`members/${a.tag}/player.json`);
+      try { return obj ? await obj.json() : null; } catch { return null; }
+    })),
+    env.DB.prepare("SELECT * FROM title_grants WHERE discord_id = ? ORDER BY id").bind(id).all(),
+  ]);
   const owned = new Map();
-  for (const a of await myAccounts(env, id)) {
-    const obj = await env.DATA.get(`members/${a.tag}/player.json`);
-    if (!obj) continue;
-    let p = null;
-    try { p = await obj.json(); } catch { continue; }
-    for (const e of (p && p.earned) || []) if (e && e.id && !owned.has(e.id)) owned.set(e.id, e);
-  }
-  const { results } = await env.DB.prepare("SELECT * FROM title_grants WHERE discord_id = ? ORDER BY id").bind(id).all();
-  for (const g of results || []) owned.set("g" + g.id, grantItem(g));
+  for (const p of players) for (const e of (p && p.earned) || []) if (e && e.id && !owned.has(e.id)) owned.set(e.id, e);
+  for (const g of grants.results || []) owned.set("g" + g.id, grantItem(g));
   return [...owned.values()];
 }
 
@@ -348,8 +350,25 @@ async function myEquip(env, id) {
   return equip;
 }
 
+// プロフィール画面に要るものを1回でまとめて返す(管理人なら管理の一覧も)
+async function profileFull(env, id) {
+  const [m, accounts] = await Promise.all([me(env, id), myAccounts(env, id)]);
+  const [owned, equip, admin] = await Promise.all([
+    ownedTitles(env, id, accounts),
+    myEquip(env, id),
+    m && m.admin
+      ? Promise.all([adminAccountsData(env), adminTitlesData(env), adminGuestsData(env)])
+      : null,
+  ]);
+  return {
+    me: m, accounts, titles: { owned, equip },
+    admin: admin ? { accounts: admin[0], titles: admin[1], guests: admin[2] } : null,
+  };
+}
+
 async function titles(env, id) {
-  return { owned: await ownedTitles(env, id), equip: await myEquip(env, id) };
+  const [owned, equip] = await Promise.all([ownedTitles(env, id), myEquip(env, id)]);
+  return { owned, equip };
 }
 
 // { top: "auto" | null | {id, shape}, bottom: ... } を保存する
@@ -384,7 +403,8 @@ async function titlesEquip(request, env, id) {
 }
 
 // ---- 管理人 ----
-async function adminTitles(env) {
+async function adminTitles(env) { return json(await adminTitlesData(env)); }
+async function adminTitlesData(env) {
   const grants = (await env.DB.prepare(
     `SELECT g.*, COALESCE(p.display_name, u.name) AS user_name FROM title_grants g
      LEFT JOIN profiles p ON p.discord_id = g.discord_id
@@ -394,18 +414,19 @@ async function adminTitles(env) {
     `SELECT u.id, COALESCE(p.display_name, u.name) AS name FROM discord_users u
      LEFT JOIN profiles p ON p.discord_id = u.id ORDER BY name`
   ).all()).results || [];
-  return json({ grants: grants.map((g) => ({ ...grantItem(g), userId: g.discord_id, userName: g.user_name })), users });
+  return { grants: grants.map((g) => ({ ...grantItem(g), userId: g.discord_id, userName: g.user_name })), users };
 }
 
 // ---- メン限ロールが無くても入れる人 ----
-async function adminGuests(env) {
+async function adminGuests(env) { return json(await adminGuestsData(env)); }
+async function adminGuestsData(env) {
   // 一度でもログインしていれば Discord の名前(表示名)を出す
   const allowed = (await env.DB.prepare(
     `SELECT a.id, a.name AS memo, a.added_at, COALESCE(p.display_name, u.name) AS name, u.last_login
      FROM allowed_users a LEFT JOIN discord_users u ON u.id = a.id LEFT JOIN profiles p ON p.discord_id = a.id
      ORDER BY a.added_at DESC`
   ).all()).results || [];
-  return json({ allowed: allowed.map((r) => ({ id: r.id, name: r.name, memo: r.memo, at: r.added_at, lastLogin: r.last_login })) });
+  return { allowed: allowed.map((r) => ({ id: r.id, name: r.name, memo: r.memo, at: r.added_at, lastLogin: r.last_login })) };
 }
 
 async function adminGuestAdd(request, env) {
@@ -464,7 +485,8 @@ async function adminRevoke(request, env) {
   return adminTitles(env);
 }
 
-async function adminAccounts(env) {
+async function adminAccounts(env) { return json(await adminAccountsData(env)); }
+async function adminAccountsData(env) {
   const { results } = await env.DB.prepare(
     `SELECT g.tag, g.role, g.name, g.discord_id, g.added_at, p.display_name, u.name AS discord_name
      FROM game_accounts g
@@ -472,7 +494,7 @@ async function adminAccounts(env) {
      LEFT JOIN discord_users u ON u.id = g.discord_id
      ORDER BY COALESCE(p.display_name, u.name), g.role = 'main' DESC, g.added_at`
   ).all();
-  return json({ accounts: results || [] });
+  return { accounts: results || [] };
 }
 
 async function adminRemove(request, env) {
@@ -537,6 +559,7 @@ export default {
         if (p === "/api/accounts/remove" && post) return await accountRemove(request, env, id);
         if (p === "/api/accounts/main" && post) return await accountMain(request, env, id);
         if (p === "/api/titles") return json(await titles(env, id));
+        if (p === "/api/profile/full") return json(await profileFull(env, id));
         if (p === "/api/titles/equip" && post) return await titlesEquip(request, env, id);
         if (p.startsWith("/api/admin/")) {
           if (!isAdmin(env, id)) return fail(403, "管理人だけが使えます");
