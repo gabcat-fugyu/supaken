@@ -1,0 +1,42 @@
+name: R2の接続確認
+
+# R2の合鍵が正しく登録できているかを確かめる。確認できたら消してよい。
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/r2-check.yml"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install boto3
+      - name: 書き込みと読み出し
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          python - <<'PY'
+          import os, boto3, datetime
+          for k in ("R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_ENDPOINT"):
+              print(k, "OK" if os.environ.get(k) else "未登録")
+          ep = os.environ["R2_ENDPOINT"].strip().rstrip("/")
+          # バケット名まで含めて貼られていても動くようにする
+          if ep.endswith("/supaken-data"):
+              ep = ep[: -len("/supaken-data")]
+          s3 = boto3.client("s3", endpoint_url=ep,
+                            aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"].strip(),
+                            aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"].strip(),
+                            region_name="auto")
+          now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+          s3.put_object(Bucket="supaken-data", Key="_check.txt", Body=f"ok {now}".encode())
+          body = s3.get_object(Bucket="supaken-data", Key="_check.txt")["Body"].read().decode()
+          print("読み出し:", body)
+          print("中身:", [o["Key"] for o in s3.list_objects_v2(Bucket="supaken-data").get("Contents", [])])
+          PY
