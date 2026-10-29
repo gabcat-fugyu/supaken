@@ -14,6 +14,7 @@
 //   /api/titles, /api/titles/equip               持っている称号と、上下に付ける称号
 //   /api/admin/accounts, /api/admin/remove       管理人: 全員の登録を見る・外す
 //   /api/admin/titles, /grant, /revoke           管理人: ユニーク称号を付ける・外す
+//   /api/admin/guests, /add, /remove             管理人: メン限ロールが無くても入れる人
 //   /api/data/...                                戦績データ(R2 の members/...)
 //
 // 使うもの(wrangler.toml / secret):
@@ -145,20 +146,31 @@ async function discordCallback(request, env) {
 
   // そのサーバーでの自分のロール(サーバーに入っていなければ 404)
   const extra = String(env.DISCORD_EXTRA_IDS || "").split(",").map((s) => s.trim()).filter(Boolean);
-  let allowed = extra.includes(user.id);
+  // 管理人が許可した人は、ロールが無くても(サーバーに入っていなくても)入れる
+  let allowed = extra.includes(user.id)
+    || !!(await env.DB.prepare("SELECT id FROM allowed_users WHERE id = ?").bind(user.id).first());
   let nick = null;
+  const ts = new Date().toISOString();
+  // 入れなかった人を残しておく(管理人が「許可する」を押せるように)
+  const denied = async (reason) => {
+    await env.DB.prepare(
+      `INSERT INTO denied_logins (id, name, avatar, reason, at) VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET name = excluded.name, avatar = excluded.avatar, reason = excluded.reason, at = excluded.at`
+    ).bind(user.id, user.global_name || user.username, user.avatar || null, reason, ts).run();
+    return back(reason);
+  };
   if (!allowed) {
     const memRes = await fetch(`${DISCORD}/users/@me/guilds/${env.DISCORD_GUILD_ID}/member`, { headers: auth });
-    if (memRes.status === 404) return back("guild");
+    if (memRes.status === 404) return denied("guild");
     if (!memRes.ok) return back("error");
     const member = await memRes.json();
     nick = member.nick;
     allowed = (member.roles || []).includes(env.DISCORD_MEMBER_ROLE_ID);
   }
-  if (!allowed) return back("role");
+  if (!allowed) return denied("role");
+  await env.DB.prepare("DELETE FROM denied_logins WHERE id = ?").bind(user.id).run();
 
   const name = nick || user.global_name || user.username;
-  const ts = new Date().toISOString();
   await env.DB.prepare(
     `INSERT INTO discord_users (id, name, avatar, created_at, last_login) VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET name = excluded.name, avatar = excluded.avatar, last_login = excluded.last_login`
@@ -381,6 +393,42 @@ async function adminTitles(env) {
   return json({ grants: grants.map((g) => ({ ...grantItem(g), userId: g.discord_id, userName: g.user_name })), users });
 }
 
+// ---- メン限ロールが無くても入れる人 ----
+async function adminGuests(env) {
+  const allowed = (await env.DB.prepare("SELECT * FROM allowed_users ORDER BY added_at DESC").all()).results || [];
+  const denied = (await env.DB.prepare(
+    "SELECT * FROM denied_logins WHERE id NOT IN (SELECT id FROM allowed_users) ORDER BY at DESC LIMIT 30"
+  ).all()).results || [];
+  const av = (r) => r.avatar ? `https://cdn.discordapp.com/avatars/${r.id}/${r.avatar}.png?size=64` : null;
+  return json({
+    allowed: allowed.map((r) => ({ id: r.id, name: r.name, at: r.added_at })),
+    denied: denied.map((r) => ({ id: r.id, name: r.name, avatar: av(r), reason: r.reason, at: r.at })),
+  });
+}
+
+async function adminGuestAdd(request, env) {
+  const b = await readBody(request);
+  const gid = String(b.id || "").trim();
+  if (!/^\d{15,21}$/.test(gid)) return fail(400, "Discord のユーザーID(数字)を入れてください");
+  const known = await env.DB.prepare("SELECT name FROM denied_logins WHERE id = ?").bind(gid).first();
+  const name = String(b.name || "").trim().slice(0, 32) || (known && known.name) || null;
+  await env.DB.prepare(
+    `INSERT INTO allowed_users (id, name, added_at) VALUES (?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET name = COALESCE(excluded.name, allowed_users.name)`
+  ).bind(gid, name, new Date().toISOString()).run();
+  return adminGuests(env);
+}
+
+// 許可を取り消す。ログイン中なら追い出す(登録したアカウントや称号は残す)
+async function adminGuestRemove(request, env) {
+  const gid = String((await readBody(request)).id || "").trim();
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM allowed_users WHERE id = ?").bind(gid),
+    env.DB.prepare("DELETE FROM sessions WHERE tag = ?").bind("d:" + gid),
+  ]);
+  return adminGuests(env);
+}
+
 async function adminGrant(request, env) {
   const b = await readBody(request);
   const uid = String(b.discordId || "");
@@ -492,6 +540,9 @@ export default {
           if (p === "/api/admin/titles") return await adminTitles(env);
           if (p === "/api/admin/titles/grant" && post) return await adminGrant(request, env);
           if (p === "/api/admin/titles/revoke" && post) return await adminRevoke(request, env);
+          if (p === "/api/admin/guests") return await adminGuests(env);
+          if (p === "/api/admin/guests/add" && post) return await adminGuestAdd(request, env);
+          if (p === "/api/admin/guests/remove" && post) return await adminGuestRemove(request, env);
         }
         return fail(404, "not found");
       }

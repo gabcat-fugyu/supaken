@@ -647,8 +647,8 @@ async function api(path, body) {
 
 // Discord から戻ってきたときの理由(?login=...)
 const LOGIN_MESSAGES = {
-  role: "スパ研のメン限ロールが確認できませんでした。メンバーシップに入っているか、Discord のアカウントが合っているか確かめてください。",
-  guild: "スパ研の Discord サーバーに入っていないようです。先にサーバーに参加してください。",
+  role: "スパ研のメン限ロールが確認できませんでした。メンバーシップに入っているか、Discord のアカウントが合っているか確かめてください。メンバー以外の人は、管理人に許可してもらうと入れます。",
+  guild: "スパ研の Discord サーバーに入っていないようです。先にサーバーに参加してください。メンバー以外の人は、管理人に許可してもらうと入れます。",
   cancel: "ログインをキャンセルしました。",
   expired: "時間がたちすぎたので、もう一度ログインしてください。",
   error: "Discord とのやり取りに失敗しました。少し待ってからもう一度試してください。",
@@ -1579,6 +1579,7 @@ function bindAccSwitch() {
 let profileData = null, adminData = null, profileMsg = { err: "", ok: "" };
 // 称号: 持っている称号と付けている称号 / 編集中の内容 / 管理人の一覧
 let titleData = null, titleEdit = null, titleSlot = "top", titleMsg = { err: "", ok: "" };
+let adminGuests = null;
 let adminTitles = null, grantForm = { discordId: "", label: "", sub: "", year: "", design: "zap", shape: "" };
 
 function startTitleEdit() {
@@ -1589,7 +1590,10 @@ function startTitleEdit() {
 async function loadTitleStuff() {
   titleData = await api("/api/titles");
   startTitleEdit();
-  if (profileData?.me?.admin) adminTitles = await api("/api/admin/titles");
+  if (profileData?.me?.admin) {
+    adminTitles = await api("/api/admin/titles");
+    adminGuests = await api("/api/admin/guests");
+  }
 }
 
 async function openProfile() {
@@ -1676,6 +1680,7 @@ function drawProfile() {
     </div>
     ${titleBox(who)}
     ${adminTitles ? grantBox() : ""}
+    ${adminGuests ? guestBox() : ""}
     ${adminData ? `<div class="pf">
       <h3>管理(全員の登録)</h3>
       <p class="note"><a href="/lab/titles/" style="color:var(--gold-lite)">称号ラボ</a> で称号の見た目を試せます。</p>
@@ -1720,6 +1725,50 @@ function drawProfile() {
   });
   bindTitleBox();
   bindGrantBox();
+  bindGuestBox();
+}
+
+// ---- 管理人: メン限ロールが無くても入れる人 ----
+function guestBox() {
+  const when = (iso) => iso ? new Date(iso).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+  const why = { role: "ロールなし", guild: "サーバー外" };
+  return `<div class="pf">
+    <h3>管理(メンバー以外で入れる人)</h3>
+    <p class="note">ここに入れた人は、メン限ロールが無くても(サーバーに入っていなくても) Discord でログインして入れます。外すとすぐ入れなくなります。</p>
+    <div class="t-label">入ろうとして入れなかった人</div>
+    ${(adminGuests.denied || []).map(d => `<div class="acc">
+      ${d.avatar ? `<img src="${esc(d.avatar)}" alt="" style="width:28px;height:28px;border-radius:50%">` : ""}
+      <span class="acc-body"><b>${esc(d.name || d.id)}</b><small>${esc(why[d.reason] || "")} · ${esc(when(d.at))}</small></span>
+      <span class="acc-btns"><button class="cr-btn go gold" data-guest-add="${esc(d.id)}">許可する</button></span>
+    </div>`).join("") || `<p class="note">いません。許可したい人に、一度ログインを試してもらうとここに出ます。</p>`}
+    <div class="t-label">許可している人</div>
+    ${(adminGuests.allowed || []).map(a => `<div class="acc">
+      <span class="acc-body"><b>${esc(a.name || "(名前不明)")}</b><small>ID ${esc(a.id)}</small></span>
+      <span class="acc-btns"><button class="cr-btn" data-guest-remove="${esc(a.id)}">外す</button></span>
+    </div>`).join("") || `<p class="note">まだいません。</p>`}
+    <div class="t-label">IDで直接入れる</div>
+    <div class="pf-row"><input id="guest-id" inputmode="numeric" placeholder="Discord のユーザーID">
+      <button class="cr-btn go gold" id="guest-add">許可</button></div>
+  </div>`;
+}
+
+function bindGuestBox() {
+  if (!adminGuests) return;
+  const go = async (path, body, ok) => {
+    profileMsg = { err: "", ok: "" };
+    try { adminGuests = await api(path, body); profileMsg.ok = ok; }
+    catch (e) { profileMsg.err = e.message; alert(e.message); }
+    draw();
+  };
+  $main.querySelectorAll("[data-guest-add]").forEach(b => {
+    b.onclick = () => go("/api/admin/guests/add", { id: b.dataset.guestAdd }, "許可しました");
+  });
+  $main.querySelectorAll("[data-guest-remove]").forEach(b => {
+    b.onclick = () => { if (confirm("この人の許可を外しますか？(ログイン中なら追い出されます)"))
+      go("/api/admin/guests/remove", { id: b.dataset.guestRemove }, "外しました"); };
+  });
+  const add = document.getElementById("guest-add");
+  if (add) add.onclick = () => go("/api/admin/guests/add", { id: document.getElementById("guest-id").value }, "許可しました");
 }
 
 // ---- プロフィール: 称号を付ける ----
