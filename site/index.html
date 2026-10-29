@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07173a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="スパ研">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/assets/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/base.css">
+<title>スパ研便利ツール</title>
+<style>
+  .hero { text-align: center; padding: 34px 0 26px; }
+  .kicker {
+    margin: 0 0 8px; font-size: 10px; font-weight: 800; letter-spacing: 0.32em; color: var(--ink-dim);
+  }
+  .title {
+    margin: 0; font-family: 'Mochiy Pop One', sans-serif; font-weight: 400; font-size: 34px; line-height: 1.2;
+    background: linear-gradient(180deg, #fffbe6 0%, var(--gold-lite) 30%, var(--gold) 55%, var(--gold-deep) 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 3px 0 rgba(4,12,32,0.7)) drop-shadow(0 0 18px rgba(255,210,63,0.25));
+  }
+  .rule {
+    width: 140px; height: 3px; margin: 14px auto 0; border-radius: 2px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  }
+
+  .tools { display: grid; gap: 12px; }
+  .tool {
+    position: relative; display: flex; align-items: center; gap: 14px;
+    padding: 16px 16px 16px 14px; border-radius: 16px; text-decoration: none; color: inherit;
+    background: linear-gradient(180deg, rgba(44,94,190,0.95), rgba(13,40,96,0.95));
+    border: 2px solid var(--panel-edge); border-bottom-width: 5px;
+    box-shadow: inset 0 2px 0 rgba(255,255,255,0.16), 0 6px 14px rgba(3,10,28,0.35);
+  }
+  .tool:active { transform: translateY(2px); border-bottom-width: 3px; }
+  .tool:focus-visible { outline: 3px solid var(--gold-lite); outline-offset: 3px; }
+  .tool-ico {
+    width: 52px; height: 52px; flex-shrink: 0; border-radius: 14px; display: grid; place-items: center;
+    background: radial-gradient(circle at 50% 35%, #3a2a8a, #140a3a);
+    border: 2px solid rgba(255,255,255,0.18);
+  }
+  .tool-ico svg { width: 28px; height: 28px; }
+  .tool-body { flex: 1; min-width: 0; }
+  .tool-body b { display: block; font-family: 'Mochiy Pop One', sans-serif; font-weight: 400; font-size: 16px; }
+  .tool-body small { display: block; margin-top: 4px; font-size: 11px; color: var(--ink-dim); line-height: 1.5; }
+  .tool-tag {
+    flex-shrink: 0; align-self: flex-start; font-size: 9.5px; font-weight: 800; padding: 3px 7px; border-radius: 6px;
+    color: #072a14; background: #7ee08a;
+  }
+  .tool.member { border-color: var(--gold-deep); }
+  .tool.member .tool-ico { background: radial-gradient(circle at 50% 35%, #6b4a0a, #2a1a02); }
+  .tool.member .tool-tag { color: #3d2600; background: linear-gradient(180deg, var(--gold-lite), var(--gold)); }
+  .chev { flex-shrink: 0; color: var(--ink-dim); font-size: 18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <p class="kicker">SUPAKEN TOOLS</p>
+    <h1 class="title">スパ研便利ツール</h1>
+    <div class="rule"></div>
+  </header>
+
+  <nav class="tools">
+    <a class="tool" href="/ranking/">
+      <span class="tool-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#ffe07a" d="M13.5 1 3.5 13.6h6.6L8.8 23l11.7-13.4h-7z"/></svg></span>
+      <span class="tool-body"><b>スパーキーランキング</b><small>日本と世界の上位で、スパーキーを使っている人のランキング</small></span>
+      <span class="tool-tag">誰でも</span>
+    </a>
+    <a class="tool member" href="/member/">
+      <span class="tool-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#ffd23f" d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm-3 8V7a3 3 0 0 1 6 0v3zm3 4a2 2 0 0 1 1 3.7V19h-2v-1.3A2 2 0 0 1 12 14z"/></svg></span>
+      <span class="tool-body"><b>メン限ページ</b><small>メンバーの順位表・戦績・プロフィール。Discord のメン限ロールで入れます</small></span>
+      <span class="tool-tag">メン限</span>
+    </a>
+  </nav>
+
+  <p class="fine">This material is unofficial and is not endorsed by Supercell.<br>For more information see Supercell's Fan Content Policy: www.supercell.com/fan-content-policy.</p>
+</div>
+</body>
+</html>

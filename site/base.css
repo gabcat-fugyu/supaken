@@ -1,0 +1,63 @@
+/* トップページとランキングページで共通の見た目(メン限ページと同じ配色) */
+:root {
+  --arena-deep: #07173a;
+  --arena-mid:  #12306e;
+  --arena-lite: #1c4699;
+  --panel-edge: #3a6fd8;
+  --gold:       #ffd23f;
+  --gold-deep:  #b8790a;
+  --gold-lite:  #ffe89a;
+  --elixir:     #d24ce0;
+  --ink:        #ffffff;
+  --ink-dim:    #a9c0ea;
+  --shadow:     rgba(3, 10, 28, 0.55);
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { touch-action: manipulation; }
+[hidden] { display: none !important; }
+body {
+  margin: 0; min-height: 100vh; color: var(--ink);
+  font-family: 'M PLUS Rounded 1c', system-ui, sans-serif; font-weight: 500;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -5%, #2b5fbf 0%, transparent 60%),
+    repeating-linear-gradient(115deg, rgba(255,255,255,0.022) 0px, rgba(255,255,255,0.022) 2px, transparent 2px, transparent 16px),
+    linear-gradient(180deg, #0d2352 0%, var(--arena-deep) 55%);
+  background-attachment: fixed;
+}
+.wrap {
+  max-width: 540px; margin: 0 auto;
+  padding: max(14px, calc(env(safe-area-inset-top) + 8px))
+           max(12px, env(safe-area-inset-right))
+           90px
+           max(12px, env(safe-area-inset-left));
+}
+.masthead { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.crest {
+  font-family: 'Mochiy Pop One', sans-serif; font-size: 17px; letter-spacing: 0.02em;
+  background: linear-gradient(180deg, var(--gold-lite), var(--gold) 45%, var(--gold-deep));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 2px 0 rgba(4,12,32,0.6));
+}
+.cr-btn {
+  font-family: 'M PLUS Rounded 1c', sans-serif; font-weight: 800; font-size: 12px;
+  color: var(--ink); cursor: pointer; text-decoration: none; display: inline-block;
+  background: linear-gradient(180deg, var(--arena-lite), var(--arena-mid));
+  border: 2px solid var(--panel-edge); border-bottom-width: 4px; border-radius: 11px;
+  padding: 7px 14px; white-space: nowrap; text-shadow: 0 1.5px 0 rgba(4,12,32,0.6);
+}
+.cr-btn:active { transform: translateY(2px); border-bottom-width: 2px; }
+.cr-btn:focus-visible { outline: 3px solid var(--gold-lite); outline-offset: 2px; }
+.fine {
+  margin-top: 28px; font-size: 9.5px; line-height: 1.6; color: rgba(169,192,234,0.7); text-align: center;
+}
+.refresh {
+  position: fixed; bottom: max(20px, env(safe-area-inset-bottom)); right: 50%;
+  transform: translateX(268px);
+  width: 52px; height: 52px; border-radius: 50%; cursor: pointer; font-size: 21px; color: #3d2600;
+  background: linear-gradient(180deg, var(--gold-lite), var(--gold) 50%, #e0a300);
+  border: 3px solid var(--gold-deep); border-bottom-width: 5px; box-shadow: 0 5px 16px rgba(0,0,0,0.45);
+}
+@media (max-width: 590px) { .refresh { right: 16px; transform: none; } }
+.refresh.busy { animation: turn 0.9s linear infinite; }
+@keyframes turn { to { rotate: 360deg; } }
+@media (prefers-reduced-motion: reduce) { .refresh.busy { animation: none; } }

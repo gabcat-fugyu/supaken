@@ -1,4 +1,4 @@
-# メンバー用アプリ(member.supaken.com)の設定
+# supaken.com の設定(トップ・スパーキーランキング・メン限ページ)
 name = "supaken-member"
 main = "worker/member.js"
 compatibility_date = "2025-09-01"
@@ -6,10 +6,10 @@ workers_dev = false
 
 # 画面のファイル(HTML・画像など)
 [assets]
-directory = "site/member"
+directory = "site"
 binding = "ASSETS"
-not_found_handling = "single-page-application"
-run_worker_first = ["/api/*"]
+# member.supaken.com の転送のため、全部のリクエストで入口を通す
+run_worker_first = true
 
 # 戦績データの置き場
 [[r2_buckets]]
@@ -29,6 +29,11 @@ ADMIN_TAGS = ""
 DISCORD_GUILD_ID = "1418622264542236697"
 DISCORD_MEMBER_ROLE_ID = "1525382489558745209"
 
+[[routes]]
+pattern = "supaken.com"
+custom_domain = true
+
+# 前のリンク。開くと supaken.com/member/ へ転送する
 [[routes]]
 pattern = "member.supaken.com"
 custom_domain = true

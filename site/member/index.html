@@ -12,9 +12,9 @@
 <meta name="apple-mobile-web-app-title" content="Battle Log">
 
 <!-- ホーム画面に追加したときのアイコン -->
-<link rel="apple-touch-icon" href="./assets/apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png">
-<link rel="icon" type="image/png" sizes="512x512" href="./assets/icon-512.png">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/assets/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/assets/icon-512.png">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -115,6 +115,57 @@
   .cr-btn:focus-visible { outline: 3px solid var(--gold-lite); outline-offset: 2px; }
 
   .masthead-btns { display: flex; gap: 6px; flex-shrink: 0; }
+  .cr-btn.icon { padding: 6px 10px; font-size: 15px; line-height: 1.2; text-decoration: none; display: inline-block; }
+
+  /* ---- プロフィール ---- */
+  .pf {
+    margin-bottom: 12px; padding: 14px 14px 16px; border-radius: 16px;
+    background: linear-gradient(180deg, rgba(44,94,190,0.92), rgba(13,40,96,0.92));
+    border: 2px solid var(--panel-edge); border-bottom-width: 4px;
+  }
+  .pf h3 { margin: 0 0 4px; font-family: 'Mochiy Pop One', sans-serif; font-weight: 400; font-size: 14px; color: var(--gold-lite); }
+  .pf .note { margin: 0 0 10px; font-size: 10.5px; color: var(--ink-dim); line-height: 1.6; }
+  .pf input, .pf select {
+    width: 100%; padding: 10px 11px; font: inherit; font-size: 16px; color: var(--ink);
+    background: rgba(6,16,40,0.65); border: 2px solid rgba(120,170,240,0.4); border-radius: 10px;
+  }
+  .pf input:focus, .pf select:focus { outline: none; border-color: var(--gold); }
+  .pf-row { display: flex; gap: 8px; align-items: center; }
+  .pf-row input { flex: 1; min-width: 0; }
+  .pf .go { flex-shrink: 0; padding: 9px 14px; }
+  .pf .go.gold, .pf .go.gold:active {
+    background: linear-gradient(180deg, var(--gold-lite), var(--gold) 50%, #e6a400);
+    border-color: var(--gold-deep); color: #3d2600; text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+  }
+  .pf .err { margin: 8px 0 0; font-size: 11px; color: #ff9b9b; line-height: 1.6; min-height: 0; }
+  .pf .ok { margin: 8px 0 0; font-size: 11px; color: #7ee08a; }
+  .acc {
+    display: flex; align-items: center; gap: 9px; padding: 9px 10px; margin-bottom: 7px; border-radius: 11px;
+    background: rgba(6,16,40,0.45); border: 1px solid rgba(120,170,240,0.25);
+  }
+  .acc-role {
+    flex-shrink: 0; font-size: 9.5px; font-weight: 800; padding: 3px 6px; border-radius: 6px;
+    color: var(--ink-dim); background: rgba(120,170,240,0.18);
+  }
+  .acc-role.main { color: #3d2600; background: linear-gradient(180deg, var(--gold-lite), var(--gold)); }
+  .acc-body { flex: 1; min-width: 0; }
+  .acc-body b { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .acc-body small { font-size: 10px; color: var(--ink-dim); }
+  .acc-btns { display: flex; gap: 5px; flex-shrink: 0; }
+  .acc-btns .cr-btn { padding: 5px 8px; font-size: 10.5px; }
+  .pf .card-ask { display: flex; align-items: center; gap: 12px; margin: 10px 0 4px; padding: 10px;
+    background: rgba(6,16,40,0.45); border: 1px solid rgba(120,170,240,0.3); border-radius: 12px; }
+  .pf .card-ask img { width: 64px; flex-shrink: 0; border-radius: 8px; }
+  .pf .card-ask p { margin: 0; font-size: 12px; line-height: 1.7; }
+  .pf .card-ask b { color: var(--gold-lite); }
+  .pf-me { display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--ink-dim); }
+  .pf-me img { width: 32px; height: 32px; border-radius: 50%; }
+  .pf-me button { margin-left: auto; }
+
+  /* 選手ページのアカウント切り替え */
+  .acc-switch { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .acc-switch .cr-btn { padding: 5px 10px; font-size: 10.5px; }
+  .banner-sub { font-size: 11px; color: var(--ink-dim); margin-top: 2px; }
 
   /* スパーキー欄 */
   .lede {
@@ -615,7 +666,9 @@
   <div class="masthead">
     <span class="crest display" id="crest">CLASH BATTLE LOG</span>
     <span class="masthead-btns">
-      <button class="cr-btn" id="nav-sparky">⚡ スパーキー</button>
+      <a class="cr-btn icon" id="nav-home" href="/" aria-label="トップへ" title="トップへ">🏠</a>
+      <button class="cr-btn icon" id="nav-sparky" aria-label="スパーキーランキング" title="スパーキーランキング">⚡</button>
+      <button class="cr-btn icon" id="nav-profile" aria-label="プロフィール" title="プロフィール">👤</button>
       <button class="cr-btn" id="back" hidden>← 戻る</button>
     </span>
   </div>
@@ -625,7 +678,7 @@
 
 <button id="refresh" class="refresh" aria-label="更新">⟳</button>
 
-<script src="./sparky-view.js"></script>
+<script src="/sparky-view.js"></script>
 <script>
 // ---- データの場所 ----
 // 戦績データは Cloudflare R2 に置いてあり、このサイト自身の /api/data/ から読む。
@@ -672,7 +725,7 @@ const DISCORD_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.3
 
 function showAuth(reason) {
   view = "auth";
-  $tabs.hidden = true; $back.hidden = true; $navSparky.hidden = true; $refresh.hidden = true;
+  $tabs.hidden = true; $back.hidden = true; $navSparky.hidden = true; $navProfile.hidden = true; $refresh.hidden = true;
   $crest.textContent = "CLASH BATTLE LOG";
   const msg = LOGIN_MESSAGES[reason] || "";
   $main.innerHTML = `<div class="auth">
@@ -713,7 +766,7 @@ const LEAGUE_FILES = {
   6: "icon_League_Badge_Royal_Champion.png",
   7: "icon_League_Badge_Ultimate_Champion.png",
 };
-const LEAGUE_IMG = (n) => `./assets/leagues/${LEAGUE_FILES[n]}`;
+const LEAGUE_IMG = (n) => `/assets/leagues/${LEAGUE_FILES[n]}`;
 
 const PAGE = 20;
 
@@ -809,6 +862,8 @@ function chaosList(battle, tag) {
 const CHAOS_COLORS = { 1: "lv1", 2: "lv2", 3: "lv3" };
 
 let index = null, metricId = "rank", view = "board", groupFilter = "ALL";
+// Discord アカウントとゲームアカウントの結びつき(プロフィールで登録したもの)
+let roster = { users: [] };
 let selectedTag = null, history = [], trophyLog = [], shown = PAGE;
 let chartRange = "all";
 let matchupRange = 50;
@@ -820,6 +875,8 @@ const $tabs = document.getElementById("tabs");
 const $refresh = document.getElementById("refresh");
 const $back = document.getElementById("back");
 const $navSparky = document.getElementById("nav-sparky");
+const $navProfile = document.getElementById("nav-profile");
+const $navHome = document.getElementById("nav-home");
 const $crest = document.getElementById("crest");
 
 const clean = (t) => (t || "").trim().toUpperCase().replace(/^#/, "");
@@ -1019,7 +1076,10 @@ function rateLine(d) {
 async function loadBoard() {
   $refresh.classList.add("busy");
   try {
-    index = await loadData("index.json");
+    [index, roster] = await Promise.all([
+      loadData("index.json"),
+      loadData("roster.json").catch(() => ({ users: [] })),
+    ]);
     draw();
   } catch (e) {
     if (view === "auth") return;          // ログイン画面に切り替わった
@@ -1100,9 +1160,38 @@ function drawTabs() {
   });
 }
 
+// 順位表に出す行。プロフィールでアカウントを登録した人は1人1行にまとめ、
+// 一番上のアカウント(リーグ → レートの順。同じならメイン)を表示名で出す。
+// まだ誰にも登録されていないアカウントは今まで通り1行ずつ。
+function userOfTag(tag) {
+  return (roster.users || []).find(u => (u.accounts || []).some(a => clean(a.tag) === clean(tag))) || null;
+}
+function boardEntries() {
+  const byTag = new Map((index?.players || []).map(p => [clean(p.tag), p]));
+  const claimed = new Set();
+  const out = [];
+  for (const u of roster.users || []) {
+    const accs = (u.accounts || []).map(a => {
+      claimed.add(clean(a.tag));
+      return { acc: a, p: byTag.get(clean(a.tag)) };
+    });
+    const name = u.displayName || accs[0]?.acc.name || "?";
+    const have = accs.filter(x => x.p);
+    if (!have.length) {                       // 登録したばかりで、まだ集計されていない
+      out.push({ tag: accs[0]?.acc.tag || "", label: name, name, pending: true });
+      continue;
+    }
+    have.sort((x, y) => (leagueOf(y.p) - leagueOf(x.p)) || (rateOf(y.p) - rateOf(x.p))
+      || ((y.acc.role === "main") - (x.acc.role === "main")));
+    out.push({ ...have[0].p, label: name });
+  }
+  for (const p of index?.players || []) if (!claimed.has(clean(p.tag))) out.push(p);
+  return out;
+}
+
 function drawBoard() {
   const m = METRICS.find(x => x.id === metricId) || METRICS[0];
-  const pool = (index?.players || []).filter(p =>
+  const pool = boardEntries().filter(p =>
     groupFilter === "ALL" || groupsOf(p).includes(groupFilter));
 
   const list = [...pool].sort((a, b) => {
@@ -1369,7 +1458,19 @@ function matchupHtml(tag) {
 // ---- 選手ページ ----
 function drawPlayer() {
   const p = (index?.players || []).find(x => clean(x.tag) === selectedTag);
-  if (!p) { $main.innerHTML = `<div class="notice">この選手は名簿にいません。</div>`; return; }
+  const owner = userOfTag(selectedTag);
+  // 同じ人のほかのアカウントへ切り替えるボタン
+  const accSwitch = owner && owner.accounts.length > 1
+    ? `<div class="acc-switch">${owner.accounts.map(a => {
+        const d = (index?.players || []).find(x => clean(x.tag) === clean(a.tag));
+        return `<button class="cr-btn${clean(a.tag) === selectedTag ? " on" : ""}" data-acc="${esc(clean(a.tag))}">${
+          a.role === "main" ? "メイン" : "サブ"}: ${esc(d?.name || a.name || a.tag)}</button>`;
+      }).join("")}</div>` : "";
+  if (!p) {
+    $main.innerHTML = `<div class="notice">このアカウントはまだ集計されていません。<br>登録してから最大10分ほどで出てきます。</div>${accSwitch}`;
+    bindAccSwitch();
+    return;
+  }
 
   const per = p.periods || {};
   const tile = (cap, num, color) =>
@@ -1436,11 +1537,13 @@ function drawPlayer() {
 
   $main.innerHTML = `
     <div class="banner">
-      <div class="banner-name display outlined">${esc(p.name)}</div>
+      <div class="banner-name display outlined">${esc(owner?.displayName || p.name)}</div>
+      ${owner?.displayName && owner.displayName !== p.name ? `<div class="banner-sub">ゲーム内の名前: ${esc(p.name)}</div>` : ""}
       ${p.clan ? `<div class="banner-clan">${esc(p.clan)}</div>` : ""}
       ${(p.titles || []).length ? `<div class="legend-row">${legendBadges(p, true)}</div>` : ""}
       ${achBadges(p, true) ? `<div class="ach-row">${achBadges(p, true)}</div>` : ""}
       ${pastChallenges(p)}
+      ${accSwitch}
       ${shieldHtml(p.leagueNumber, "banner-shield")}
       <div class="banner-league">${esc(leagueName(p.leagueNumber))}</div>
       ${useRate
@@ -1514,6 +1617,135 @@ function drawPlayer() {
   });
   const more = document.getElementById("more");
   if (more) more.onclick = () => { shown += PAGE; draw(); };
+  bindAccSwitch();
+}
+
+function bindAccSwitch() {
+  $main.querySelectorAll("[data-acc]").forEach(b => { b.onclick = () => openPlayer(b.dataset.acc); });
+}
+
+// ---- プロフィール ----
+// 表示名と、ゲームアカウント(メイン1つ+サブ2つまで)の登録。
+// 追加するときは、そのアカウントのお気に入りカードを指定のカードにしてもらって本人確認する。
+let profileData = null, linkState = null, profileMsg = { err: "", ok: "" };
+
+async function openProfile() {
+  view = "profile"; linkState = null; profileMsg = { err: "", ok: "" };
+  draw();
+  try { profileData = await api("/api/profile"); }
+  catch (e) { profileMsg.err = e.message; }
+  draw();
+}
+
+// プロフィールを変えたら、順位表のまとまりも読み直す
+async function afterProfileChange(data, okMsg) {
+  profileData = data; linkState = null; profileMsg = { err: "", ok: okMsg || "" };
+  if (data.me) currentUser = data.me;
+  try { roster = await loadData("roster.json"); } catch {}
+  draw();
+}
+
+function drawProfile() {
+  if (!profileData) {
+    $main.innerHTML = profileMsg.err
+      ? `<div class="notice">${esc(profileMsg.err)}</div>` : `<div class="notice">読み込み中…</div>`;
+    return;
+  }
+  const { me: who, accounts } = profileData;
+  const full = accounts.length >= 3;
+  const hasMain = accounts.some(a => a.role === "main");
+  const subs = accounts.filter(a => a.role === "sub").length;
+  const summary = (tag) => (index?.players || []).find(x => clean(x.tag) === clean(tag));
+
+  const accRows = accounts.map(a => {
+    const d = summary(a.tag);
+    const lg = d ? (isTenkai(d) && d.rating != null ? `天界 ${d.rating}` : leagueName(d.leagueNumber)) : "集計待ち";
+    return `<div class="acc">
+      <span class="acc-role${a.role === "main" ? " main" : ""}">${a.role === "main" ? "メイン" : "サブ"}</span>
+      <span class="acc-body"><b>${esc(d?.name || a.name || a.tag)}</b><small>#${esc(a.tag)} · ${esc(lg)}</small></span>
+      <span class="acc-btns">
+        ${a.role === "sub" ? `<button class="cr-btn" data-main="${esc(a.tag)}">メインにする</button>` : ""}
+        <button class="cr-btn" data-remove="${esc(a.tag)}">外す</button>
+      </span>
+    </div>`;
+  }).join("") || `<p class="note">まだ登録していません。</p>`;
+
+  let addBox = "";
+  if (linkState) {
+    addBox = `<div class="card-ask">
+        <img src="${esc(linkState.card.icon)}" alt="${esc(linkState.card.name)}">
+        <p><b>${esc(linkState.playerName)}</b> のクラロワで、プロフィールの<b>お気に入りカード</b>を
+        このカード(<b>${esc(linkState.card.name)}</b>)にしてください。</p>
+      </div>
+      <div class="pf-row" style="margin-top:10px">
+        <button class="cr-btn go gold" id="pf-finish" style="flex:1">変えたので登録する</button>
+        <button class="cr-btn go" id="pf-cancel">やめる</button>
+      </div>`;
+  } else if (!full) {
+    addBox = `<div class="pf-row">
+        <input id="pf-tag" placeholder="#タグ" autocapitalize="characters">
+        ${hasMain ? `<select id="pf-role" style="width:auto">
+          <option value="sub"${subs >= 2 ? " disabled" : ""}>サブ</option>
+          <option value="main">メイン</option>
+        </select>` : ""}
+        <button class="cr-btn go gold" id="pf-start">追加</button>
+      </div>
+      <p class="note" style="margin:8px 0 0">${hasMain
+        ? "メインで追加すると、今のメインはサブになります。" : "最初に登録したアカウントがメインになります。"}</p>`;
+  } else {
+    addBox = `<p class="note">メイン1つとサブ2つ、全部登録済みです。</p>`;
+  }
+
+  $main.innerHTML = `
+    <div class="pf">
+      <h3>表示名</h3>
+      <p class="note">順位表やプレイヤーページに出る名前です。</p>
+      <div class="pf-row">
+        <input id="pf-name" maxlength="16" value="${esc(who?.name || "")}">
+        <button class="cr-btn go gold" id="pf-save">保存</button>
+      </div>
+    </div>
+    <div class="pf">
+      <h3>ゲームアカウント</h3>
+      <p class="note">メイン1つとサブ2つまで。順位表には、一番リーグ(レート)が高いアカウントが出ます。同じならメインが出ます。</p>
+      ${accRows}
+      <div style="margin-top:10px">${addBox}</div>
+      ${profileMsg.err ? `<p class="err">${esc(profileMsg.err)}</p>` : ""}
+      ${profileMsg.ok ? `<p class="ok">${esc(profileMsg.ok)}</p>` : ""}
+    </div>
+    <div class="pf pf-me">
+      ${who?.avatar ? `<img src="${esc(who.avatar)}" alt="">` : ""}
+      <span>Discord: ${esc(who?.discordName || "")} でログイン中</span>
+      <button class="cr-btn" id="pf-logout">ログアウト</button>
+    </div>`;
+
+  const run = async (fn, okMsg) => {
+    profileMsg = { err: "", ok: "" };
+    try { await afterProfileChange(await fn(), okMsg); }
+    catch (e) { profileMsg.err = e.message; draw(); }
+  };
+  const $ = (id) => document.getElementById(id);
+  $("pf-save").onclick = () => run(() => api("/api/profile", { displayName: $("pf-name").value }), "表示名を保存しました");
+  $("pf-logout").onclick = () => logout();
+  if ($("pf-start")) $("pf-start").onclick = async () => {
+    profileMsg = { err: "", ok: "" };
+    try {
+      linkState = await api("/api/accounts/start", { tag: $("pf-tag").value, role: $("pf-role")?.value || "main" });
+    } catch (e) { profileMsg.err = e.message; }
+    draw();
+  };
+  if ($("pf-finish")) $("pf-finish").onclick = () => run(() => api("/api/accounts/finish", {}),
+    "登録しました。戦績は最大10分ほどで出てきます");
+  if ($("pf-cancel")) $("pf-cancel").onclick = () => { linkState = null; profileMsg = { err: "", ok: "" }; draw(); };
+  $main.querySelectorAll("[data-main]").forEach(b => {
+    b.onclick = () => run(() => api("/api/accounts/main", { tag: b.dataset.main }), "メインを変更しました");
+  });
+  $main.querySelectorAll("[data-remove]").forEach(b => {
+    b.onclick = () => {
+      if (!confirm("このアカウントを外しますか？(戦績の記録は消えません)")) return;
+      run(() => api("/api/accounts/remove", { tag: b.dataset.remove }), "外しました");
+    };
+  });
 }
 
 // ---- スパーキーランキング ----
@@ -1528,20 +1760,25 @@ function draw() {
   if (view === "auth") return;
   $back.hidden = view === "board";
   $navSparky.hidden = view !== "board";
+  $navProfile.hidden = view !== "board";
+  $navHome.hidden = view !== "board";
   $crest.textContent = view === "player" ? "PLAYER"
-    : view === "sparky" ? "SPARKY RANKING" : "CLASH BATTLE LOG";
+    : view === "sparky" ? "SPARKY RANKING" : view === "profile" ? "PROFILE" : "CLASH BATTLE LOG";
   drawTabs();
   if (view === "sparky") return;      // 中身は SparkyView が描く
+  if (view === "profile") return drawProfile();
   view === "player" ? drawPlayer() : drawBoard();
 }
 
 $navSparky.onclick = () => openSparky();
+$navProfile.onclick = () => openProfile();
 $back.onclick = () => {
   SparkyView.unmount();
   view = "board"; selectedTag = null; opened.clear(); draw();
 };
 $refresh.onclick = () => {
   if (view === "sparky") { SparkyView.reload(); return; }
+  if (view === "profile") { openProfile(); return; }
   if (view === "player" && selectedTag) { const t = selectedTag; loadBoard().then(() => openPlayer(t)); }
   else loadBoard();
 };

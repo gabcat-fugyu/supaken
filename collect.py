@@ -811,6 +811,17 @@ def read_players():
                 titles.append({k: v for k, v in t.items() if k in ("label", "sub", "replaces", "image", "year")})
 
         entries.append((tag, item.get("name") or None, groups, titles))
+
+    # メン限ページのプロフィールで登録されたアカウント(Worker が R2 に書き出す roster.json)
+    # players.json に無いものも集計する。表示名は画面の方で付ける
+    known = {e[0] for e in entries}
+    roster = load_json(DATA_DIR / "roster.json", {}) or {}
+    for user in roster.get("users") or []:
+        for acc in user.get("accounts") or []:
+            tag = str(acc.get("tag", "")).strip().upper().lstrip("#")
+            if tag and tag not in known:
+                entries.append((tag, None, [], []))
+                known.add(tag)
     return entries
 
 

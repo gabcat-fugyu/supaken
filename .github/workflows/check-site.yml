@@ -1,6 +1,6 @@
 name: サイトの動作確認
 
-# 公開したサイトが開けるか、データが読めるかを外から確かめる
+# 公開したサイトが開けるか、メン限のデータが守られているかを外から確かめる
 on:
   workflow_dispatch:
   push:
@@ -10,52 +10,45 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - name: 確認
         run: |
           python3 - <<'PY'
           import json, time, urllib.request, urllib.error
-          def get(url):
-              req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 supaken-check"})
-              try:
-                  with urllib.request.urlopen(req, timeout=30) as r:
-                      return r.status, r.headers.get("content-type"), r.read()
-              except urllib.error.HTTPError as e:
-                  return e.code, e.headers.get("content-type"), e.read()
-              except Exception as e:
-                  return None, None, str(e).encode()
-          out = []
-          def post(url, body):
-              req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST",
-                  headers={"User-Agent": "Mozilla/5.0 supaken-check", "content-type": "application/json"})
-              try:
-                  with urllib.request.urlopen(req, timeout=30) as r:
-                      return r.status, r.read()
-              except urllib.error.HTTPError as e:
-                  return e.code, e.read()
-          for attempt in range(6):
-              st, ct, body = get("https://member.supaken.com/")
-              if st == 200: break
-              time.sleep(20)
-          html = body.decode("utf-8", "ignore")
-          out.append(f"トップ: {st} {len(body)}バイト ログイン画面入り={'showAuth' in html}")
-          B = "https://member.supaken.com"
-          st, _, b = get(B + "/api/me"); out.append(f"未ログインの /api/me: {st} {b[:80].decode('utf-8','ignore')}")
-          st, _, b = get(B + "/api/data/index.json"); out.append(f"未ログインのデータ: {st} {b[:80].decode('utf-8','ignore')}")
+          from urllib.parse import urlparse, parse_qs
+
           class NoRedirect(urllib.request.HTTPRedirectHandler):
               def redirect_request(self, *a, **k): return None
           opener = urllib.request.build_opener(NoRedirect)
-          try:
-              r = opener.open(urllib.request.Request(B + "/api/discord/login", headers={"User-Agent": "Mozilla/5.0"}), timeout=30)
-              st, loc = r.status, r.headers.get("location")
-          except urllib.error.HTTPError as e:
-              st, loc = e.code, e.headers.get("location")
-          from urllib.parse import urlparse, parse_qs
-          q = parse_qs(urlparse(loc or "").query)
-          out.append(f"Discordログイン: {st} → {urlparse(loc or '').netloc} client_id={'あり' if q.get('client_id', [''])[0] not in ('', 'undefined') else 'なし'} scope={q.get('scope')} redirect={q.get('redirect_uri')}")
-          st, _, b = get(B + "/api/discord/callback?code=x&state=y"); out.append(f"不正な戻り: {st}")
-          st, _, b = get(B + "/assets/icon-192.png"); out.append(f"画像: {st} {len(b)}バイト")
+
+          def get(url):
+              req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 supaken-check"})
+              try:
+                  r = opener.open(req, timeout=30)
+                  return r.status, r.headers, r.read()
+              except urllib.error.HTTPError as e:
+                  return e.code, e.headers, e.read()
+              except Exception as e:
+                  return None, {}, str(e).encode()
+
+          B = "https://supaken.com"
+          out = []
+          for attempt in range(8):                 # 新しいドメインは行き渡るまで少しかかる
+              st, h, body = get(B + "/")
+              if st == 200: break
+              time.sleep(20)
+          out.append(f"トップ: {st} タイトル入り={'スパ研便利ツール' in body.decode('utf-8','ignore')}")
+          st, h, body = get(B + "/ranking/"); out.append(f"ランキング: {st} 部品入り={'SparkyView.mount' in body.decode('utf-8','ignore')}")
+          st, h, body = get(B + "/member/"); out.append(f"メン限ページ: {st} ログイン画面入り={'showAuth' in body.decode('utf-8','ignore')}")
+          st, h, body = get("https://member.supaken.com/"); out.append(f"前のリンク: {st} → {h.get('location')}")
+          st, h, body = get(B + "/api/data/index.json"); out.append(f"未ログインのデータ: {st}")
+          st, h, body = get(B + "/api/profile"); out.append(f"未ログインのプロフィール: {st}")
+          st, h, body = get(B + "/api/discord/login")
+          q = parse_qs(urlparse(h.get("location") or "").query)
+          out.append(f"Discordログイン: {st} redirect={q.get('redirect_uri')}")
+          st, h, body = get(B + "/assets/icon-192.png"); out.append(f"画像: {st} {len(body)}バイト")
+          st, h, body = get(B + "/sparky-view.js"); out.append(f"sparky-view.js: {st}")
           for line in out:
               print(line)
               print(f"::notice title=確認::{line}")
