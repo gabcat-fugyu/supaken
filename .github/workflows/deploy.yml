@@ -28,6 +28,8 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CR_API_TOKEN: ${{ secrets.CR_API_TOKEN }}
+          DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
+          DISCORD_CLIENT_SECRET: ${{ secrets.DISCORD_CLIENT_SECRET }}
           CI: "true"
         run: |
           set +e
@@ -54,6 +56,9 @@ jobs:
           step "表を用意" $W d1 execute supaken --remote --file schema.sql
 
           step "公開" $W deploy
-          echo "$CR_API_TOKEN" > token.txt
-          step "クラロワAPIのトークンを登録" sh -c "$W secret put CR_API_TOKEN < token.txt"
-          rm -f token.txt
+          # 合鍵を Worker に渡す(値はログに出ない)
+          for name in CR_API_TOKEN DISCORD_CLIENT_ID DISCORD_CLIENT_SECRET; do
+            printenv "$name" > secret.txt
+            step "$name を登録" sh -c "$W secret put $name < secret.txt"
+          done
+          rm -f secret.txt

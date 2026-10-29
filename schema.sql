@@ -25,3 +25,13 @@ CREATE TABLE IF NOT EXISTS challenges (
   card_icon  TEXT,
   expires_at INTEGER NOT NULL
 );
+
+-- Discord でログインした人。tag はあとでクラロワのアカウントと結びつけたときに入る
+CREATE TABLE IF NOT EXISTS discord_users (
+  id         TEXT PRIMARY KEY,
+  name       TEXT,
+  avatar     TEXT,
+  tag        TEXT,
+  created_at TEXT NOT NULL,
+  last_login TEXT
+);

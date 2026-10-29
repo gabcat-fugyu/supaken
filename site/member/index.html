@@ -593,6 +593,16 @@
   .auth .card-ask img { width: 64px; flex-shrink: 0; border-radius: 8px; }
   .auth .card-ask p { margin: 0; font-size: 12px; line-height: 1.7; }
   .auth .card-ask b { color: var(--gold-lite); }
+  .discord-btn {
+    display: flex; align-items: center; justify-content: center; gap: 9px;
+    margin-top: 16px; padding: 13px; border-radius: 12px;
+    font-family: 'M PLUS Rounded 1c', sans-serif; font-weight: 800; font-size: 15px;
+    color: #fff; text-decoration: none; background: #5865f2;
+    border: 2px solid #3c45c4; border-bottom-width: 4px;
+  }
+  .discord-btn:active { transform: translateY(2px); border-bottom-width: 2px; }
+  .discord-btn svg { width: 22px; height: 22px; fill: #fff; }
+  .auth .fine { margin: 14px 0 0; font-size: 10.5px; color: var(--ink-dim); line-height: 1.7; text-align: center; }
   .whoami { font-size: 10.5px; color: var(--ink-dim); margin-top: 6px; padding-left: 3px; }
   .whoami button { background: none; border: 0; padding: 0; font: inherit; color: var(--gold-lite); text-decoration: underline; cursor: pointer; }
   .refresh.busy { animation: turn 0.9s linear infinite; }
@@ -626,14 +636,14 @@ const SPARKY_REPO = "gabcat-fugyu/Sparkylab";
 
 async function loadData(path) {
   const res = await fetch(`/api/data/${path}?t=${Date.now()}`, { cache: "no-store" });
-  if (res.status === 401) { showAuth("login"); throw new Error("401"); }
+  if (res.status === 401) { showAuth(); throw new Error("401"); }
   if (!res.ok) throw new Error(String(res.status));
   return await res.json();
 }
 
 // ---- ログイン ----
-// アカウントの ID はクラロワのタグ。はじめての人とパスワードを忘れた人は、
-// お気に入りカードを指定のカードにしてもらって本人確認する。
+// スパ研の Discord でメン限ロールを持っている人だけが入れる。
+// ログインは Discord の画面で行い、終わるとこのページに戻ってくる。
 let currentUser = null;
 
 async function api(path, body) {
@@ -649,78 +659,29 @@ async function api(path, body) {
   return data;
 }
 
-function showAuth(mode, state = {}) {
+// Discord から戻ってきたときの理由(?login=...)
+const LOGIN_MESSAGES = {
+  role: "スパ研のメン限ロールが確認できませんでした。メンバーシップに入っているか、Discord のアカウントが合っているか確かめてください。",
+  guild: "スパ研の Discord サーバーに入っていないようです。先にサーバーに参加してください。",
+  cancel: "ログインをキャンセルしました。",
+  expired: "時間がたちすぎたので、もう一度ログインしてください。",
+  error: "Discord とのやり取りに失敗しました。少し待ってからもう一度試してください。",
+};
+
+const DISCORD_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.3 4.4A19.8 19.8 0 0 0 15.4 3l-.6 1.3a18.4 18.4 0 0 0-5.6 0L8.6 3a19.7 19.7 0 0 0-4.9 1.4C.6 9 -.3 13.5.1 18a19.9 19.9 0 0 0 6 3l1.3-2.1a12.9 12.9 0 0 1-2-1l.5-.4a14.2 14.2 0 0 0 12.2 0l.5.4c-.6.4-1.3.7-2 1L18 21a19.8 19.8 0 0 0 6-3c.5-5.2-.8-9.7-3.7-13.6zM8 15.3c-1.2 0-2.2-1.1-2.2-2.4S6.8 10.5 8 10.5s2.2 1.1 2.2 2.4-1 2.4-2.2 2.4zm8 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4z"/></svg>`;
+
+function showAuth(reason) {
   view = "auth";
   $tabs.hidden = true; $back.hidden = true; $navSparky.hidden = true; $refresh.hidden = true;
   $crest.textContent = "CLASH BATTLE LOG";
-  const tagVal = esc(state.tag || localStorageGet("lastTag") || "");
-
-  if (mode === "login") {
-    $main.innerHTML = `<form class="auth" id="auth">
-      <h2>ログイン</h2>
-      <p class="lede">スパ研メンバー専用です</p>
-      <label for="a-tag">クラロワのタグ</label>
-      <input id="a-tag" autocomplete="username" placeholder="#C22R8GLC" value="${tagVal}" autocapitalize="characters">
-      <label for="a-pass">パスワード</label>
-      <input id="a-pass" type="password" autocomplete="current-password">
-      <button class="cr-btn go gold" type="submit">ログイン</button>
-      <p class="err" id="a-err"></p>
-      <button class="switch" type="button" id="a-switch">はじめての人・パスワードを忘れた人はこちら</button>
-    </form>`;
-    document.getElementById("a-switch").onclick = () => showAuth("register", { tag: document.getElementById("a-tag").value });
-    document.getElementById("auth").onsubmit = async (e) => {
-      e.preventDefault();
-      const tag = document.getElementById("a-tag").value, password = document.getElementById("a-pass").value;
-      try { currentUser = await api("/api/login", { tag, password }); localStorageSet("lastTag", tag); enterApp(); }
-      catch (err) { document.getElementById("a-err").textContent = err.message; }
-    };
-    return;
-  }
-
-  if (mode === "register") {
-    $main.innerHTML = `<form class="auth" id="auth">
-      <h2>はじめての人</h2>
-      <p class="lede">クラロワのアカウントで本人確認をして、パスワードを決めます。<br>パスワードを忘れたときも、ここからやり直せます。</p>
-      <label for="a-tag">クラロワのタグ</label>
-      <input id="a-tag" placeholder="#C22R8GLC" value="${tagVal}" autocapitalize="characters">
-      <button class="cr-btn go gold" type="submit">次へ</button>
-      <p class="err" id="a-err"></p>
-      <button class="switch" type="button" id="a-switch">ログイン画面にもどる</button>
-    </form>`;
-    document.getElementById("a-switch").onclick = () => showAuth("login");
-    document.getElementById("auth").onsubmit = async (e) => {
-      e.preventDefault();
-      const tag = document.getElementById("a-tag").value;
-      try { const r = await api("/api/register/start", { tag }); showAuth("verify", { tag, ...r }); }
-      catch (err) { document.getElementById("a-err").textContent = err.message; }
-    };
-    return;
-  }
-
-  if (mode === "verify") {
-    $main.innerHTML = `<form class="auth" id="auth">
-      <h2>本人確認</h2>
-      <p class="lede">${esc(state.name || "")} さん、クラロワで次のことをしてください。</p>
-      <div class="card-ask">
-        <img src="${esc(state.card.icon)}" alt="${esc(state.card.name)}">
-        <p>プロフィールの<b>お気に入りカード</b>を<br>このカード(<b>${esc(state.card.name)}</b>)にする</p>
-      </div>
-      <label for="a-pass">決めたいパスワード(4文字以上)</label>
-      <input id="a-pass" type="password" autocomplete="new-password">
-      <button class="cr-btn go gold" type="submit">変えたので登録する</button>
-      <p class="err" id="a-err"></p>
-      <button class="switch" type="button" id="a-switch">やめる</button>
-    </form>`;
-    document.getElementById("a-switch").onclick = () => showAuth("login", { tag: state.tag });
-    document.getElementById("auth").onsubmit = async (e) => {
-      e.preventDefault();
-      const password = document.getElementById("a-pass").value;
-      try {
-        currentUser = await api("/api/register/finish", { tag: state.tag, password });
-        localStorageSet("lastTag", state.tag); enterApp();
-      } catch (err) { document.getElementById("a-err").textContent = err.message; }
-    };
-  }
+  const msg = LOGIN_MESSAGES[reason] || "";
+  $main.innerHTML = `<div class="auth">
+    <h2>メンバー限定</h2>
+    <p class="lede">スパ研の Discord で<br><b>メン限ロール</b>を持っている人が入れます</p>
+    <a class="discord-btn" href="/api/discord/login">${DISCORD_ICON}Discord でログイン</a>
+    <p class="err">${esc(msg)}</p>
+    <p class="fine">Discord の名前とアイコン、スパ研サーバーでのロールだけを確認します。<br>一度ログインすると30日はそのまま入れます。</p>
+  </div>`;
 }
 
 function enterApp() {
@@ -731,12 +692,8 @@ function enterApp() {
 async function logout() {
   try { await api("/api/logout", {}); } catch {}
   currentUser = null; index = null;
-  showAuth("login");
+  showAuth();
 }
-
-// 端末に覚えておく小物(最後に入れたタグ)。使えない環境でも動くように
-function localStorageGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
-function localStorageSet(k, v) { try { localStorage.setItem(k, v); } catch {} }
 
 // ---- リーグ ----
 // leagueNumber 1〜3 がマスターI〜III、4〜6 が神々の挑戦I〜III、7 が天界。
@@ -1591,8 +1548,10 @@ $refresh.onclick = () => {
 
 // 起動。ログインしていればそのまま、していなければログイン画面
 (async () => {
+  const reason = new URLSearchParams(location.search).get("login");
+  if (reason) history.replaceState(null, "", location.pathname);   // アドレスの ?login=… を消す
   try { currentUser = await api("/api/me"); enterApp(); }
-  catch { showAuth("login"); }
+  catch { showAuth(reason); }
 })();
 </script>
 </body>

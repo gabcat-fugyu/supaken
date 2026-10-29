@@ -43,9 +43,18 @@ jobs:
           B = "https://member.supaken.com"
           st, _, b = get(B + "/api/me"); out.append(f"未ログインの /api/me: {st} {b[:80].decode('utf-8','ignore')}")
           st, _, b = get(B + "/api/data/index.json"); out.append(f"未ログインのデータ: {st} {b[:80].decode('utf-8','ignore')}")
-          st, b = post(B + "/api/login", {"tag": "#PRRRPLQGR", "password": "wrong-password"}); out.append(f"違うパスワード: {st} {b[:80].decode('utf-8','ignore')}")
-          st, b = post(B + "/api/register/start", {"tag": "#AAAAAAAA"}); out.append(f"名簿にないタグ: {st} {b[:80].decode('utf-8','ignore')}")
-          st, b = post(B + "/api/register/start", {"tag": "#PRRRPLQGR"}); out.append(f"名簿にあるタグの本人確認: {st} {b[:160].decode('utf-8','ignore')}")
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, *a, **k): return None
+          opener = urllib.request.build_opener(NoRedirect)
+          try:
+              r = opener.open(urllib.request.Request(B + "/api/discord/login", headers={"User-Agent": "Mozilla/5.0"}), timeout=30)
+              st, loc = r.status, r.headers.get("location")
+          except urllib.error.HTTPError as e:
+              st, loc = e.code, e.headers.get("location")
+          from urllib.parse import urlparse, parse_qs
+          q = parse_qs(urlparse(loc or "").query)
+          out.append(f"Discordログイン: {st} → {urlparse(loc or '').netloc} client_id={'あり' if q.get('client_id', [''])[0] not in ('', 'undefined') else 'なし'} scope={q.get('scope')} redirect={q.get('redirect_uri')}")
+          st, _, b = get(B + "/api/discord/callback?code=x&state=y"); out.append(f"不正な戻り: {st}")
           st, _, b = get(B + "/assets/icon-192.png"); out.append(f"画像: {st} {len(b)}バイト")
           for line in out:
               print(line)
