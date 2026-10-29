@@ -47,6 +47,7 @@ window.Titles = (function () {
     { id: "notch",  name: "角カット" },
     { id: "ribbon", name: "リボン" },
     { id: "blade",  name: "剣" },
+    { id: "flame",  name: "右端が炎" },
   ];
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>

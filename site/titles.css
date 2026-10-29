@@ -270,6 +270,35 @@
                    calc(100% - var(--pt)) 100%, 70% 100%, 68% 88%, 32% 88%, 30% 100%, var(--pt) 100%, 0 50%);
 }
 
+/* 右端が炎(左は尖り、右は炎の舌がゆらめく)
+   右の端だけ炎の形の絵(SVG)で型抜きする。炎の絵を3枚切り替えて揺らす */
+.shape-flame {
+  --fw: 30px;   /* 炎の部分の幅 */
+  --shape: polygon(var(--pt) 0, 100% 0, 100% 100%, var(--pt) 100%, 0 50%);
+  --f1: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 100' preserveAspectRatio='none'><path d='M0 0C9 0 12 5 19 1C16 9 23 13 37 6C29 18 24 24 33 30C23 32 21 39 40 47C25 51 23 57 31 65C21 65 19 73 35 85C21 83 15 91 18 100L0 100Z'/></svg>");
+  --f2: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 100' preserveAspectRatio='none'><path d='M0 0C8 0 14 7 22 3C18 12 26 16 39 12C29 22 25 27 34 35C24 36 22 42 38 52C24 54 23 61 33 70C22 69 18 78 32 90C19 87 14 94 16 100L0 100Z'/></svg>");
+  --f3: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 100' preserveAspectRatio='none'><path d='M0 0C10 0 11 4 17 0C15 7 21 10 35 3C28 15 23 21 31 27C22 30 20 36 39 42C26 47 24 54 34 61C23 62 20 70 38 81C23 80 16 88 20 100L0 100Z'/></svg>");
+  padding-right: calc(var(--fw) + 6px) !important;
+  -webkit-mask: linear-gradient(#000, #000) left / calc(100% - var(--fw) + 1px) 100% no-repeat,
+                var(--f1) right / var(--fw) 100% no-repeat;
+          mask: linear-gradient(#000, #000) left / calc(100% - var(--fw) + 1px) 100% no-repeat,
+                var(--f1) right / var(--fw) 100% no-repeat;
+  animation: ttl-spin var(--spin) linear infinite, ttl-burn 0.75s steps(1) infinite;
+}
+.shape-flame .ttl-bg {
+  background:
+    radial-gradient(60% 130% at 100% 50%, var(--glow), transparent 72%),
+    var(--pattern), linear-gradient(180deg, var(--bg1), var(--bg2));
+  -webkit-mask: inherit; mask: inherit;
+  animation: ttl-burn 0.75s steps(1) infinite;
+}
+@keyframes ttl-burn {
+  0%   { -webkit-mask-image: linear-gradient(#000, #000), var(--f1); mask-image: linear-gradient(#000, #000), var(--f1); }
+  33%  { -webkit-mask-image: linear-gradient(#000, #000), var(--f2); mask-image: linear-gradient(#000, #000), var(--f2); }
+  66%  { -webkit-mask-image: linear-gradient(#000, #000), var(--f3); mask-image: linear-gradient(#000, #000), var(--f3); }
+}
+.ttl.big.shape-flame { --fw: 64px; }
+
 /* ==================== 大きい札(プレイヤーページ) ==================== */
 .ttl.big {
   --bw: 2.5px; --pt: 14px;
@@ -287,6 +316,6 @@
 .ttl-wrap.big-wrap { filter: drop-shadow(0 0 7px var(--glow)); }
 
 @media (prefers-reduced-motion: reduce) {
-  .ttl, .ttl svg, .ttl b, .ttl::before { animation: none !important; }
+  .ttl, .ttl svg, .ttl b, .ttl::before, .ttl-bg { animation: none !important; }
   .ttl::after { display: none; }
 }
