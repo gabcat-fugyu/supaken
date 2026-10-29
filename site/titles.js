@@ -3,6 +3,9 @@
  *   Titles.html({ label, sub, year, design, shape }, { big })
  *   Titles.DESIGNS  … 選べるデザインの一覧
  *   Titles.SHAPES   … 選べる形の一覧
+ *   Titles.RARITIES … レアリティ(下から順に)と、その色(デザイン)
+ *   Titles.CATALOG  … 自動で付く称号の一覧(判定は collect.py の TITLE_RULES と同じ id)
+ *   Titles.resolve(item) … 付いている称号 {id, ...} を、表示に使う形 {label, design, ...} にする
  */
 window.Titles = (function () {
   const ICONS = {
@@ -51,6 +54,76 @@ window.Titles = (function () {
     { id: "blaze",  name: "炎の枠" },
   ];
 
+  // レアリティ。下から順に。色はデザイン(DESIGNS の id)で決まる
+  const RARITIES = [
+    { id: "normal",   name: "ノーマル",     design: "normal",   rank: 1 },
+    { id: "rare",     name: "レア",         design: "rare",     rank: 2 },
+    { id: "super",    name: "スーパーレア", design: "super",    rank: 3 },
+    { id: "ultra",    name: "ウルトラレア", design: "diamond",  rank: 4 },
+    { id: "champion", name: "チャンピオン", design: "champion", rank: 5 },
+    { id: "unique",   name: "ユニーク",     design: "zap",      rank: 6 },   // 管理人が付ける
+  ];
+  const RARITY = Object.fromEntries(RARITIES.map((r) => [r.id, r]));
+
+  // 自動で付く称号。how は「どうすれば付くか」の説明
+  const CATALOG = [
+    { id: "tenkai",    cat: "rating", rarity: "normal",   label: "天界到達",         how: "天界に乗る" },
+    { id: "rate2000",  cat: "rating", rarity: "rare",     label: "レート2000到達",   how: "天界でレート2000" },
+    { id: "rate2500",  cat: "rating", rarity: "super",    label: "レート2500到達",   how: "天界でレート2500" },
+    { id: "rate3000",  cat: "rating", rarity: "ultra",    label: "レート3000到達",   how: "天界でレート3000" },
+    { id: "rate3500",  cat: "rating", rarity: "champion", label: "レート3500到達",   how: "天界でレート3500" },
+    { id: "rate4000",  cat: "rating", rarity: "unique",   label: "レート4000到達",   how: "天界でレート4000(管理人が付けます)", manual: true },
+    { id: "wins5000",  cat: "wins",   rarity: "normal",   label: "通算5000勝",       how: "通算で5000勝" },
+    { id: "wins10000", cat: "wins",   rarity: "rare",     label: "通算10000勝",      how: "通算で10000勝" },
+    { id: "wins15000", cat: "wins",   rarity: "super",    label: "通算15000勝",      how: "通算で15000勝" },
+    { id: "wins20000", cat: "wins",   rarity: "ultra",    label: "通算20000勝",      how: "通算で20000勝" },
+    { id: "wins30000", cat: "wins",   rarity: "champion", label: "通算30000勝",      how: "通算で30000勝" },
+    { id: "streak5",   cat: "streak", rarity: "normal",   label: "5連勝達成",        how: "5連勝する" },
+    { id: "streak10",  cat: "streak", rarity: "rare",     label: "10連勝達成",       how: "10連勝する" },
+    { id: "streak20",  cat: "streak", rarity: "super",    label: "20連勝達成",       how: "20連勝する" },
+    { id: "streak30",  cat: "streak", rarity: "ultra",    label: "30連勝達成",       how: "30連勝する" },
+    { id: "streak50",  cat: "streak", rarity: "champion", label: "50連勝達成",       how: "50連勝する" },
+    { id: "crl20",     cat: "crl20",  rarity: "champion", label: "20勝達成",         how: "CRL 20勝チャレンジで20勝(年ごと)" },
+    { id: "top10000",  cat: "rank",   rarity: "rare",     label: "TOP10000",         how: "天界の世界ランキングで10000位以内" },
+    { id: "top5000",   cat: "rank",   rarity: "super",    label: "TOP5000",          how: "天界の世界ランキングで5000位以内" },
+    { id: "top1000",   cat: "rank",   rarity: "ultra",    label: "TOP1000",          how: "天界の世界ランキングで1000位以内" },
+    { id: "top200",    cat: "rank",   rarity: "ultra",    label: "TOP200",           how: "天界の世界ランキングで200位以内" },
+    { id: "top100",    cat: "rank",   rarity: "champion", label: "TOP100",           how: "天界の世界ランキングで100位以内" },
+    { id: "classic",   cat: "challenge", rarity: "rare",  label: "クラシックチャレンジクリア", how: "クラシックチャレンジで12勝" },
+    { id: "grand",     cat: "challenge", rarity: "super", label: "グランドチャレンジクリア",   how: "グランドチャレンジで12勝" },
+  ];
+  const CATS = [
+    { id: "rating", name: "レート" }, { id: "wins", name: "通算勝利数" }, { id: "streak", name: "連勝" },
+    { id: "crl20", name: "20勝チャレンジ" }, { id: "rank", name: "世界ランキング" }, { id: "challenge", name: "チャレンジ" },
+  ];
+  const BY_ID = Object.fromEntries(CATALOG.map((c) => [c.id, c]));
+
+  // 付いている称号 → 表示に使う形。
+  //   自動の称号は {id, at}、20勝は {id: "crl20-2026", year}、
+  //   管理人が付けたもの・手書きのものは {id, label, sub, year, design, shape, rarity} を持っている
+  function resolve(item) {
+    if (!item || !item.id) return null;
+    const m = /^crl20-(\d{4})$/.exec(item.id);
+    const base = m ? BY_ID.crl20 : BY_ID[item.id];
+    if (item.label || !base) {
+      if (!item.label) return null;
+      const r = RARITY[item.rarity] || RARITY.unique;
+      return { id: item.id, label: item.label, sub: item.sub || "", year: item.year || "",
+               rarity: r.id, rank: r.rank, design: item.design || r.design, fixedShape: item.shape || "" };
+    }
+    const r = RARITY[base.rarity];
+    const year = m ? Number(m[1]) : null;
+    return { id: item.id, label: m ? `20勝達成(${year})` : base.label, sub: m ? "CRL 20WIN" : "",
+             year: "", rarity: r.id, rank: r.rank, design: r.design, fixedShape: "",
+             order: CATALOG.indexOf(base) + (year ? year / 10000 : 0) };
+  }
+
+  // 一番レアな称号(同じならあとに並ぶ=条件のきびしい方、20勝は新しい年)
+  function best(list) {
+    return (list || []).map(resolve).filter(Boolean)
+      .sort((a, b) => (b.rank - a.rank) || ((b.order ?? 99) - (a.order ?? 99)))[0] || null;
+  }
+
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
@@ -80,5 +153,5 @@ window.Titles = (function () {
     return shaped ? `<span class="ttl-wrap tw-${d.id}${opts.big ? " big-wrap" : ""}">${inner}</span>` : inner;
   }
 
-  return { DESIGNS, SHAPES, ICONS, html };
+  return { DESIGNS, SHAPES, ICONS, RARITIES, RARITY, CATALOG, CATS, resolve, best, html };
 })();

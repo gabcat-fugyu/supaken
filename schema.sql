@@ -64,3 +64,27 @@ CREATE TABLE IF NOT EXISTS link_challenges (
   card_icon  TEXT,
   expires_at INTEGER NOT NULL
 );
+
+-- 管理人が付けた称号(ユニーク)。Discord の1人に付く
+CREATE TABLE IF NOT EXISTS title_grants (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  discord_id TEXT NOT NULL,
+  label      TEXT NOT NULL,
+  sub        TEXT,
+  year       TEXT,
+  design     TEXT NOT NULL,
+  shape      TEXT,                   -- 空なら本人が形を選べる。入っていればその形で固定(炎の枠など)
+  granted_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS title_grants_owner ON title_grants (discord_id);
+
+-- 付けている称号。slot は 'top'(名前の上) か 'bottom'(名前の下)。
+-- 行が無ければ「おまかせ」(上は一番レアな称号、下はなし)。title_id が空なら「なし」
+CREATE TABLE IF NOT EXISTS title_equips (
+  discord_id TEXT NOT NULL,
+  slot       TEXT NOT NULL,
+  title_id   TEXT NOT NULL,
+  shape      TEXT,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (discord_id, slot)
+);

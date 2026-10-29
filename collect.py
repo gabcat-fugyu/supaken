@@ -13,6 +13,7 @@ GitHub Actions から定期実行される前提。公式APIは直近25試合し
     CR_API_TOKEN  developer.clashroyale.com で発行したトークン
 """
 
+import hashlib
 import json
 import os
 import re
@@ -63,6 +64,31 @@ ACHIEVEMENTS = [
     {"id": "crl20-2026", "label": "20勝達成", "eventTag": "#2CJUG2VL", "wins": 20,
      "badge": "Crl20Wins2026", "year": 2026, "aliases": ["shocktober-20"]},
 ]
+
+# 自動で付く称号。見た目と名前は site/titles.js の CATALOG に同じ id で書く。
+#   一度付いた称号は、あとで条件を満たさなくなっても消えない。
+TITLE_RULES = [
+    # (id, 何を見るか, いくつ以上か)
+    ("tenkai",   "tenkai",  1),        # 天界に乗った
+    ("rate2000", "rating",  2000),
+    ("rate2500", "rating",  2500),
+    ("rate3000", "rating",  3000),
+    ("rate3500", "rating",  3500),     # 4000 は管理人が付ける(ユニーク)
+    ("wins5000",  "wins",   5000),
+    ("wins10000", "wins",   10000),
+    ("wins15000", "wins",   15000),
+    ("wins20000", "wins",   20000),
+    ("wins30000", "wins",   30000),
+    ("streak5",  "streak",  5),
+    ("streak10", "streak",  10),
+    ("streak20", "streak",  20),
+    ("streak30", "streak",  30),
+    ("streak50", "streak",  50),
+    ("classic",  "classic", 1),        # クラシックチャレンジ12勝
+    ("grand",    "grand",   1),        # グランドチャレンジ12勝
+]
+# 世界ランキングの順位(この順位以内に入った)
+RANK_RULES = [("top10000", 10000), ("top5000", 5000), ("top1000", 1000), ("top200", 200), ("top100", 100)]
 
 ROOT = Path(__file__).parent
 PLAYERS_FILE = ROOT / "players.json"
@@ -663,6 +689,8 @@ def collect_player(tag: str, label, groups, token: str, probe: bool = False):
         "bestRating": best_pol.get("trophies"),
         "bestLeagueNumber": best_pol.get("leagueNumber"),
         "lastRating": last_pol.get("trophies"),
+        "bestRank": best_pol.get("rank"),
+        "lastRank": last_pol.get("rank"),
         # 通常トロフィー
         "trophies": player.get("trophies"),
         "bestTrophies": player.get("bestTrophies"),
@@ -682,6 +710,10 @@ def collect_player(tag: str, label, groups, token: str, probe: bool = False):
             prev.get("achievements"), list(battles) + merged_recent, tag, now,
             player.get("badges")),
     }
+
+    # 称号(自己最高の記録と、付いた称号)
+    summary["records"] = title_records(prev, summary, merged, tag, player.get("badges"))
+    summary["earned"] = earn_titles(prev.get("earned"), summary, now)
 
     # 画面用: 直近だけフル装備(デッキやスターレベルも入る)
     save_json(player_dir / "recent.json", pack_recent(merged_recent))
@@ -772,6 +804,95 @@ def update_achievements(prev_list, battles, tag: str, now, badges=None):
     return sorted(have.values(), key=lambda a: order.get(a["id"], len(order)))
 
 
+def best_win_streak(history, tag: str) -> int:
+    """記録している全試合の中での最大連勝(引き分けで途切れる)。"""
+    timed = sorted(((parse_battle_time(b.get("battleTime", "")), b) for b in history),
+                   key=lambda x: x[0] or datetime.min.replace(tzinfo=timezone.utc))
+    best = run = 0
+    for when, b in timed:
+        if when is None:
+            continue
+        r = battle_result(b, tag)
+        run = run + 1 if r else 0
+        best = max(best, run)
+    return best
+
+
+def title_records(prev: dict, summary: dict, history, tag: str, badges) -> dict:
+    """称号の判定に使う自己最高。前回の記録より下がらないようにする。"""
+    old = prev.get("records") or {}
+    nums = lambda *xs: [x for x in xs if isinstance(x, (int, float))]
+    league = max(nums(summary.get("rawLeagueNumber"), summary.get("bestLeagueNumber"),
+                      old.get("league")) or [0])
+    # レートは天界にいるときだけ意味がある
+    raw = summary.get("rawRating") if summary.get("rawLeagueNumber") == 7 else None
+    rating = max(nums(raw, summary.get("bestRating"), summary.get("lastRating"), old.get("rating")) or [0])
+    ranks = [r for r in nums(summary.get("polRank"), summary.get("bestRank"), summary.get("lastRank"),
+                             old.get("rank")) if r > 0]
+    by_name = {str(b.get("name")): b for b in badges or []}
+    # 世界TOP1000に入った回数のバッジがあれば、1000位以内に入ったことがある
+    if (by_name.get("LadderTop1000") or {}).get("progress", 0) >= 1:
+        ranks.append(1000)
+    prog = lambda n: (by_name.get(n) or {}).get("progress") or 0
+    # 天界: 今いるリーグが7、またはレートが付いたことがある。
+    # 昔のシーズンの記録は番号の付け方が違い、10 が天界にあたる
+    tenkai = (summary.get("rawLeagueNumber") == 7 or rating > 0
+              or summary.get("bestLeagueNumber") == 10 or old.get("tenkai"))
+    return {
+        "tenkai": 1 if tenkai else 0,
+        "league": league,
+        "rating": rating,
+        "rank": min(ranks) if ranks else None,
+        "wins": max(nums(summary.get("wins"), old.get("wins")) or [0]),
+        "streak": max(nums(best_win_streak(history, tag), old.get("streak")) or [0]),
+        "classic": max(prog("Classic12Wins"), old.get("classic") or 0),
+        "grand": max(prog("Grand12Wins"), old.get("grand") or 0),
+    }
+
+
+def earn_titles(prev_list, summary: dict, now) -> list:
+    """付いている称号の一覧 [{id, at}, ...]。前回までの分に、新しく満たした分を足す。"""
+    have = {e.get("id"): e for e in prev_list or [] if isinstance(e, dict) and e.get("id")}
+    rec = summary.get("records") or {}
+    stamp = now.isoformat(timespec="seconds")
+
+    new = []
+
+    def add(tid, extra=None):
+        if tid not in have:
+            have[tid] = {"id": tid, "at": stamp, **(extra or {})}
+            new.append(tid)
+
+    for tid, key, need in TITLE_RULES:
+        if (rec.get(key) or 0) >= need:
+            add(tid)
+    for tid, need in RANK_RULES:
+        if rec.get("rank") and rec["rank"] <= need:
+            add(tid)
+    # 20勝チャレンジは年ごと(プロフィールのバッジと、今年のイベントの記録から)
+    years = {c.get("year") for c in summary.get("pastChallenges") or []}
+    years |= {a.get("year") for a in summary.get("achievements") or []}
+    for y in sorted(y for y in years if isinstance(y, int)):
+        add(f"crl20-{y}", {"year": y})
+    if new:
+        print(f"    🏅 新しい称号: {', '.join(new)}")
+    return sorted(have.values(), key=lambda e: e.get("at", ""))
+
+
+def legacy_titles(titles) -> list:
+    """players.json に手で書いた特別な称号を、称号の形にする(ユニーク)。"""
+    out = []
+    for t in titles or []:
+        label = str(t.get("label", "")).strip()
+        if not label:
+            continue
+        slug = t.get("id") or hashlib.md5(label.encode("utf-8")).hexdigest()[:8]
+        out.append({"id": "x-" + slug, "label": label,
+                    "sub": t.get("sub"), "year": t.get("year"), "rarity": "unique",
+                    "design": t.get("design") or "zap", "shape": t.get("shape") or ""})
+    return out
+
+
 def read_players():
     """players.json から追跡対象を読む。[(タグ, 表示名, グループ一覧), ...] を返す。
 
@@ -808,7 +929,7 @@ def read_players():
             if isinstance(t, str) and t.strip():
                 titles.append({"label": t.strip()})
             elif isinstance(t, dict) and str(t.get("label", "")).strip():
-                titles.append({k: v for k, v in t.items() if k in ("label", "sub", "replaces", "image", "year")})
+                titles.append({k: v for k, v in t.items() if k in ("id", "label", "sub", "replaces", "image", "year", "design", "shape")})
 
         entries.append((tag, item.get("name") or None, groups, titles))
 
@@ -854,6 +975,10 @@ def main():
             failed += 1
         if result:
             result["titles"] = titles
+            # 手で付けた特別な称号も「付いている称号」に入れる(毎回 players.json から作り直す)
+            auto = [e for e in result.get("earned") or [] if not str(e.get("id", "")).startswith("x-")]
+            result["earned"] = auto + legacy_titles(titles)
+            save_json(DATA_DIR / tag / "player.json", result)
             summaries.append(result)
         if i < len(entries) - 1:
             time.sleep(1)

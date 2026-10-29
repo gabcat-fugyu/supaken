@@ -11,11 +11,13 @@
 //   /api/me, /api/logout                         ログイン状態
 //   /api/profile                                 表示名と、結びつけたゲームアカウント
 //   /api/accounts/add, /remove, /main            ゲームアカウントを追加・外す・メインにする
+//   /api/titles, /api/titles/equip               持っている称号と、上下に付ける称号
 //   /api/admin/accounts, /api/admin/remove       管理人: 全員の登録を見る・外す
+//   /api/admin/titles, /grant, /revoke           管理人: ユニーク称号を付ける・外す
 //   /api/data/...                                戦績データ(R2 の members/...)
 //
 // 使うもの(wrangler.toml / secret):
-//   DB    … D1(sessions / discord_users / profiles / game_accounts)
+//   DB    … D1(sessions / discord_users / profiles / game_accounts / title_grants / title_equips)
 //   DATA  … R2(戦績データ。members/roster.json にアカウントの結びつきを書き出す)
 //   DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_GUILD_ID, DISCORD_MEMBER_ROLE_ID, DISCORD_EXTRA_IDS
 //   ADMIN_DISCORD_IDS … 管理人の Discord ユーザーID(カンマ区切り)
@@ -195,6 +197,19 @@ async function writeRoster(env) {
     }
     users.get(r.discord_id).accounts.push({ tag: r.tag, role: r.role, name: r.name });
   }
+  // 付けている称号と、管理人が付けた称号
+  const equips = (await env.DB.prepare("SELECT discord_id, slot, title_id, shape FROM title_equips").all()).results || [];
+  for (const e of equips) {
+    const u = users.get(e.discord_id);
+    if (!u) continue;
+    u.equip = u.equip || {};
+    u.equip[e.slot] = e.title_id ? { id: e.title_id, shape: e.shape || "" } : null;
+  }
+  const grants = (await env.DB.prepare("SELECT * FROM title_grants ORDER BY id").all()).results || [];
+  for (const g of grants) {
+    const u = users.get(g.discord_id);
+    if (u) (u.grants = u.grants || []).push(grantItem(g));
+  }
   const roster = { updatedAt: new Date().toISOString(), users: [...users.values()] };
   await env.DATA.put("members/roster.json", JSON.stringify(roster), {
     httpMetadata: { contentType: "application/json; charset=utf-8" },
@@ -283,7 +298,119 @@ async function accountRemove(request, env, id) {
   return json(await profile(env, id));
 }
 
+// ---- 称号 ----
+// 自動の称号は収集(collect.py)が各アカウントの player.json の earned に書く。
+// 管理人が付けた称号(ユニーク)は D1 の title_grants。
+const USER_SHAPES = ["rect", "point", "notch", "ribbon", "blade"];   // 本人が選べる形(炎の枠は選べない)
+const ALL_SHAPES = [...USER_SHAPES, "blaze"];
+const DESIGN_IDS = ["normal", "rare", "super", "platinum", "diamond", "emerald", "champion",
+  "zap", "flame", "ice", "rainbow", "abyss", "sakura", "cosmos", "thunder", "sunset", "std"];
+
+const grantItem = (g) => ({
+  id: "g" + g.id, label: g.label, sub: g.sub || "", year: g.year || "",
+  design: g.design, shape: g.shape || "", rarity: "unique", at: g.granted_at,
+});
+
+async function ownedTitles(env, id) {
+  const owned = new Map();
+  for (const a of await myAccounts(env, id)) {
+    const obj = await env.DATA.get(`members/${a.tag}/player.json`);
+    if (!obj) continue;
+    let p = null;
+    try { p = await obj.json(); } catch { continue; }
+    for (const e of (p && p.earned) || []) if (e && e.id && !owned.has(e.id)) owned.set(e.id, e);
+  }
+  const { results } = await env.DB.prepare("SELECT * FROM title_grants WHERE discord_id = ? ORDER BY id").bind(id).all();
+  for (const g of results || []) owned.set("g" + g.id, grantItem(g));
+  return [...owned.values()];
+}
+
+async function myEquip(env, id) {
+  const { results } = await env.DB.prepare("SELECT slot, title_id, shape FROM title_equips WHERE discord_id = ?").bind(id).all();
+  const equip = {};
+  for (const e of results || []) equip[e.slot] = e.title_id ? { id: e.title_id, shape: e.shape || "" } : null;
+  return equip;
+}
+
+async function titles(env, id) {
+  return { owned: await ownedTitles(env, id), equip: await myEquip(env, id) };
+}
+
+// { top: "auto" | null | {id, shape}, bottom: ... } を保存する
+async function titlesEquip(request, env, id) {
+  const body = await readBody(request);
+  const owned = new Map((await ownedTitles(env, id)).map((t) => [t.id, t]));
+  const ts = new Date().toISOString();
+  const stmts = [];
+  for (const slot of ["top", "bottom"]) {
+    if (!(slot in body)) continue;
+    const v = body[slot];
+    if (v === "auto") {
+      stmts.push(env.DB.prepare("DELETE FROM title_equips WHERE discord_id = ? AND slot = ?").bind(id, slot));
+      continue;
+    }
+    let tid = "", shape = "";
+    if (v && typeof v === "object") {
+      tid = String(v.id || "");
+      const t = owned.get(tid);
+      if (!t) return fail(400, "持っていない称号は付けられません");
+      shape = t.shape ? "" : String(v.shape || "rect");          // 形が決まっている称号はそのまま
+      if (shape && !USER_SHAPES.includes(shape)) return fail(400, "その形は選べません");
+    }
+    stmts.push(env.DB.prepare(
+      `INSERT INTO title_equips (discord_id, slot, title_id, shape, updated_at) VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(discord_id, slot) DO UPDATE SET title_id = excluded.title_id, shape = excluded.shape, updated_at = excluded.updated_at`
+    ).bind(id, slot, tid, shape, ts));
+  }
+  if (stmts.length) await env.DB.batch(stmts);
+  await writeRoster(env);
+  return json(await titles(env, id));
+}
+
 // ---- 管理人 ----
+async function adminTitles(env) {
+  const grants = (await env.DB.prepare(
+    `SELECT g.*, COALESCE(p.display_name, u.name) AS user_name FROM title_grants g
+     LEFT JOIN profiles p ON p.discord_id = g.discord_id
+     LEFT JOIN discord_users u ON u.id = g.discord_id ORDER BY g.id DESC`
+  ).all()).results || [];
+  const users = (await env.DB.prepare(
+    `SELECT u.id, COALESCE(p.display_name, u.name) AS name FROM discord_users u
+     LEFT JOIN profiles p ON p.discord_id = u.id ORDER BY name`
+  ).all()).results || [];
+  return json({ grants: grants.map((g) => ({ ...grantItem(g), userId: g.discord_id, userName: g.user_name })), users });
+}
+
+async function adminGrant(request, env) {
+  const b = await readBody(request);
+  const uid = String(b.discordId || "");
+  const label = String(b.label || "").trim();
+  if (!uid || !(await env.DB.prepare("SELECT id FROM discord_users WHERE id = ?").bind(uid).first())) {
+    return fail(400, "付ける人を選んでください");
+  }
+  if (!label) return fail(400, "称号の文字を入れてください");
+  if ([...label].length > 20) return fail(400, "称号の文字は20文字までです");
+  const design = DESIGN_IDS.includes(b.design) ? b.design : "zap";
+  const shape = ALL_SHAPES.includes(b.shape) ? b.shape : "";
+  await env.DB.prepare(
+    "INSERT INTO title_grants (discord_id, label, sub, year, design, shape, granted_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+  ).bind(uid, label, String(b.sub || "").trim().slice(0, 24), String(b.year || "").trim().slice(0, 8),
+    design, shape, new Date().toISOString()).run();
+  await writeRoster(env);
+  return adminTitles(env);
+}
+
+async function adminRevoke(request, env) {
+  const gid = Number(String((await readBody(request)).id || "").replace(/^g/, ""));
+  if (!gid) return fail(400, "bad id");
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM title_grants WHERE id = ?").bind(gid),
+    env.DB.prepare("DELETE FROM title_equips WHERE title_id = ?").bind("g" + gid),
+  ]);
+  await writeRoster(env);
+  return adminTitles(env);
+}
+
 async function adminAccounts(env) {
   const { results } = await env.DB.prepare(
     `SELECT g.tag, g.role, g.name, g.discord_id, g.added_at, p.display_name, u.name AS discord_name
@@ -356,10 +483,15 @@ export default {
         if (p === "/api/accounts/add" && post) return await accountAdd(request, env, id);
         if (p === "/api/accounts/remove" && post) return await accountRemove(request, env, id);
         if (p === "/api/accounts/main" && post) return await accountMain(request, env, id);
+        if (p === "/api/titles") return json(await titles(env, id));
+        if (p === "/api/titles/equip" && post) return await titlesEquip(request, env, id);
         if (p.startsWith("/api/admin/")) {
           if (!isAdmin(env, id)) return fail(403, "管理人だけが使えます");
           if (p === "/api/admin/accounts") return await adminAccounts(env);
           if (p === "/api/admin/remove" && post) return await adminRemove(request, env);
+          if (p === "/api/admin/titles") return await adminTitles(env);
+          if (p === "/api/admin/titles/grant" && post) return await adminGrant(request, env);
+          if (p === "/api/admin/titles/revoke" && post) return await adminRevoke(request, env);
         }
         return fail(404, "not found");
       }

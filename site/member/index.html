@@ -16,6 +16,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/assets/icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="/assets/icon-512.png">
 
+<link rel="stylesheet" href="/titles.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet">
@@ -230,114 +231,39 @@
     text-shadow: 0 1.5px 0 rgba(4,12,32,0.55);
   }
   .plate-sub { display: block; font-size: 10.5px; color: var(--ink-dim); margin-top: 1px; }
-  /* 順位表の称号。名前の上に1つだけ載せ、他にもあれば +N で示す(名前を削らない) */
+  /* ---- 称号(見た目は /titles.css。称号ラボと同じ部品) ---- */
   .plate-titles { display: flex; align-items: center; gap: 4px; margin: 0 0 3px; min-width: 0; }
-  .plate-titles .ach, .plate-titles .legend { height: 16px; font-size: 9px; }
-  .plate-titles .ach svg, .plate-titles .legend svg { width: 11px; height: 11px; }
-  .t-more {
-    flex-shrink: 0; font-size: 9px; font-weight: 800; line-height: 1;
-    padding: 3px 5px; border-radius: 5px;
-    color: var(--ink-dim); background: rgba(6,16,40,0.55); border: 1px solid rgba(120,170,240,0.35);
+  .plate-titles.bottom { margin: 3px 0 0; }
+  .plate-titles .ttl { height: 17px; font-size: 9px; }
+  .plate-titles .ttl svg { width: 11px; height: 11px; }
+  .plate-titles .bz { --h: 17px; font-size: 9px; }
+  .title-row { display: flex; justify-content: center; margin: 10px 0 4px; }
+  .title-row.under { margin: 8px 0 2px; }
+  /* 選手ページ: 持っている称号の棚 */
+  .shelf-btn { margin-top: 10px; }
+  .title-shelf { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 6px; margin-top: 10px; }
+  /* プロフィール: 称号えらび */
+  .t-preview { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin: 4px 0 12px;
+               border-radius: 12px; background: rgba(6,16,40,0.45); border: 1px solid rgba(120,170,240,0.3); }
+  .t-preview .plate-name { font-size: 14px; }
+  .t-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+  .t-choices { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tchoice {
+    display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 5px 8px;
+    border-radius: 10px; cursor: pointer; font: inherit; font-size: 11px; font-weight: 800; color: var(--ink-dim);
+    background: rgba(6,16,40,0.5); border: 2px solid rgba(120,170,240,0.25);
   }
-
-  /* ---- 達成バッジ ---- */
-  .ach {
-    position: relative; overflow: hidden; flex-shrink: 0;
-    display: inline-flex; align-items: center; gap: 3px;
-    height: 18px; padding: 0 7px 0 4px; border-radius: 6px;
-    font-family: 'Mochiy Pop One', sans-serif; font-size: 9.5px; line-height: 1;
-    color: #fff4c8; white-space: nowrap;
-    text-shadow: 0 1px 0 rgba(70,0,40,0.65);
-    background: linear-gradient(135deg, #6a1bd1 0%, #c81f6e 55%, #ff8a1f 100%);
-    border: 1.5px solid var(--gold);
-    box-shadow: 0 0 10px -2px rgba(255,170,60,0.75), inset 0 1px 0 rgba(255,255,255,0.35);
-  }
-  .ach b { font-weight: normal; }
-  .ach svg { width: 12px; height: 12px; fill: var(--gold-lite); flex-shrink: 0;
-             filter: drop-shadow(0 0 2px rgba(255,220,120,0.9)); }
-  /* ときどき光が走る */
-  .ach::after {
-    content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%;
-    background: linear-gradient(100deg, transparent, rgba(255,255,255,0.6), transparent);
-    transform: skewX(-20deg);
-    animation: ach-shine 3.4s ease-in-out infinite;
-  }
-  @keyframes ach-shine { 0%, 62% { left: -60%; } 100% { left: 130%; } }
-  @media (prefers-reduced-motion: reduce) { .ach::after { display: none; } }
-  .ach.big { height: 26px; padding: 0 11px 0 7px; border-radius: 9px; gap: 5px; font-size: 12px; border-width: 2px; }
-  .ach.big svg { width: 16px; height: 16px; }
-  .ach-row { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-
-  /* ---- 特別な称号(手で付けるもの) ----
-     闇色の地に、銀と紫の光が回り続ける縁。紫の電撃をまとう */
-  @property --leg-a { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
-  .legend {
-    position: relative; flex-shrink: 0;
-    display: inline-flex; align-items: center; gap: 4px;
-    height: 20px; padding: 0 8px 0 5px; border-radius: 7px;
-    font-family: 'Mochiy Pop One', sans-serif; font-size: 10px; line-height: 1; white-space: nowrap;
-    border: 2px solid transparent;
-    background:
-      radial-gradient(120% 140% at 50% 0%, #3a1470 0%, #1a0838 55%, #0b0320 100%) padding-box,
-      conic-gradient(from var(--leg-a), #f7f3ff, #8f86ad, #c77dff, #ffffff, #e8c98a, #6f6593, #e2b8ff, #f7f3ff) border-box;
-    box-shadow: 0 0 10px -1px rgba(180,77,255,0.85), 0 0 22px -8px rgba(214,150,255,0.9);
-    animation: leg-spin 3.5s linear infinite;
-  }
-  .legend b {
-    font-weight: normal;
-    background: linear-gradient(180deg, #ffffff 0%, #eee4ff 40%, #b59ae0 58%, #f6efff 100%);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-    filter: drop-shadow(0 1px 0 rgba(0,0,0,0.6));
-  }
-  .legend svg {
-    width: 13px; height: 13px; flex-shrink: 0; fill: #e2b8ff;
-    filter: drop-shadow(0 0 3px #b44dff) drop-shadow(0 0 6px rgba(180,77,255,0.7));
-    animation: leg-zap 2.2s steps(1) infinite;
-  }
-  .legend .legend-sub { display: none; }
-  @keyframes leg-spin { to { --leg-a: 360deg; } }
-  /* 電撃がときどきバチッと光る */
-  @keyframes leg-zap {
-    0%, 70%, 78%, 100% { opacity: 1; }
-    72% { opacity: 0.35; }
-    75% { opacity: 1; filter: drop-shadow(0 0 5px #fff) drop-shadow(0 0 10px #b44dff); }
-  }
-  @media (prefers-reduced-motion: reduce) { .legend, .legend svg { animation: none; } }
-
-  /* 選手ページ用の大きい版。英字の小見出しを上に添える */
-  .legend.big {
-    height: auto; padding: 7px 16px 8px 12px; border-radius: 12px; gap: 9px; border-width: 2.5px;
-    font-size: 15px;
-  }
-  .legend.big svg { width: 24px; height: 24px; }
-  .legend.big .legend-text { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
-  .legend.big .legend-sub {
-    display: block; font-family: inherit; font-size: 8.5px; letter-spacing: 0.22em; color: #e2b8ff;
-    text-shadow: 0 0 6px rgba(180,77,255,0.9);
-  }
-  .legend-row { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-  /* 画像で用意した称号(選手ページ)。紫の光がゆっくり脈打つ */
-  .legend-img {
-    display: block; width: min(100%, 360px); height: auto; margin: -2px auto -4px;
-    animation: leg-glow 2.8s ease-in-out infinite;
-  }
-  @keyframes leg-glow {
-    0%, 100% { filter: drop-shadow(0 0 6px rgba(180,77,255,0.45)); }
-    50%      { filter: drop-shadow(0 0 16px rgba(200,110,255,0.95)); }
-  }
-  @media (prefers-reduced-motion: reduce) { .legend-img { animation: none; } }
-
-  /* 過去の20勝チャレンジ。選手ページだけに出す控えめな記章 */
-  .past-row { display: flex; justify-content: center; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
-  .past {
-    display: inline-flex; align-items: center; gap: 3px;
-    height: 19px; padding: 0 7px 0 5px; border-radius: 6px;
-    font-size: 9.5px; font-weight: 800; white-space: nowrap; color: var(--gold-lite);
-    background: linear-gradient(180deg, rgba(60,30,110,0.9), rgba(30,14,60,0.9));
-    border: 1px solid rgba(255,210,63,0.55);
-  }
-  .past svg { width: 10px; height: 10px; fill: var(--gold); }
-  .past i { font-style: normal; color: var(--ink-dim); font-weight: 700; }
+  .tchoice.on { border-color: var(--gold); color: var(--gold-lite); background: rgba(255,210,63,0.1); }
+  .t-label { font-size: 11px; font-weight: 800; color: var(--ink-dim); margin: 12px 0 6px; }
+  .t-cat { font-size: 11px; font-weight: 800; color: var(--gold-lite); margin: 12px 0 6px; }
+  .t-cat-list { display: grid; gap: 6px; }
+  .t-item { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .t-item small { font-size: 10px; color: var(--ink-dim); }
+  .t-item.locked .ttl, .t-item.locked .bz { filter: grayscale(1) brightness(0.55); opacity: 0.7; }
+  .t-rar { font-size: 9px; font-weight: 800; padding: 2px 5px; border-radius: 5px; background: rgba(6,16,40,0.6);
+           color: var(--ink-dim); border: 1px solid rgba(120,170,240,0.3); }
+  .pf select, .pf input { min-width: 0; }
+  .pf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 
   .plate-value {
     flex-shrink: 0; text-align: right;
@@ -679,6 +605,7 @@
 <button id="refresh" class="refresh" aria-label="更新">⟳</button>
 
 <script src="/sparky-view.js"></script>
+<script src="/titles.js"></script>
 <script>
 // ---- データの場所 ----
 // 戦績データは Cloudflare R2 に置いてあり、このサイト自身の /api/data/ から読む。
@@ -907,56 +834,44 @@ const DROP = `<svg viewBox="0 0 10 13" aria-hidden="true"><path d="M5 0C5 0 0 5.
 
 // ---- 達成バッジ ----
 // collect.py の ACHIEVEMENTS で決めた目標(CRL 20勝チャレンジなど)を達成した人に付く
-const ACH_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.5l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7L2 8.7l7.1-.6z"/></svg>`;
-const ZAP_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 1 3.5 13.6h6.6L8.8 23l11.7-13.4h-7z"/></svg>`;
+// ---- 称号 ----
+// 称号は人(Discord)に付く。自動の称号は、その人のアカウントの earned を合わせたもの。
+// 管理人が付けたもの(ユニーク)は roster の grants。上下に何を付けるかは roster の equip。
+// まだ登録されていないアカウントは、そのアカウントの称号だけで「おまかせ」表示。
+const playerOf = (tag) => (index?.players || []).find(x => clean(x.tag) === clean(tag));
 
-// 手で付けた特別な称号(players.json の titles)
-// 今の20勝チャレンジの年。これより前の年の達成は「過去の20勝」に回す
-const challengeYear = () => index?.challengeYear ?? null;
-const isCurrent = (x) => x.year == null || challengeYear() == null || x.year === challengeYear();
-
-function legendBadges(p, big) {
-  // 順位表には今の年の称号だけ。選手ページには全部
-  return (p.titles || []).filter(t => big || isCurrent(t)).map(t => big && t.image
-    ? `<img class="legend-img" src="${esc(t.image)}" alt="${esc(t.label)}" title="${esc(t.label)}">`
-    : `<span class="legend${big ? " big" : ""}" title="${esc(t.label)}">${ZAP_ICON}<span class="legend-text">${
-      (t.sub || !isCurrent(t))
-        ? `<span class="legend-sub">${esc([t.sub, isCurrent(t) ? null : t.year].filter(Boolean).join(" · "))}</span>`
-        : ""}<b>${esc(t.label)}</b></span></span>`
-  ).join("");
+function ownedOf(user, p) {
+  const tags = user ? (user.accounts || []).map(a => a.tag) : [p?.tag];
+  const map = new Map();
+  for (const t of tags) for (const e of playerOf(t)?.earned || []) if (e?.id && !map.has(e.id)) map.set(e.id, e);
+  for (const g of user?.grants || []) map.set(g.id, g);
+  return [...map.values()];
 }
 
-// 過去の20勝チャレンジ (2025) など。選手ページだけで使う
-function pastChallenges(p) {
-  // プロフィールのバッジで分かった年と、前の年のチャレンジで付いた達成を合わせる
-  const years = new Set();
-  for (const c of p.pastChallenges || []) if (typeof c.year === "number") years.add(c.year);
-  for (const a of p.achievements || []) if (typeof a.year === "number") years.add(a.year);
-  const list = [...years].filter(y => y !== challengeYear()).sort((a, b) => b - a);
-  if (!list.length) return "";
-  return `<div class="past-row">${list.map(y =>
-    `<span class="past">${ACH_ICON}20勝達成<i>(${esc(y)})</i></span>`).join("")}</div>`;
+// レアな順に並べる
+const byRarity = (list) => list.map(e => Titles.resolve(e)).filter(Boolean)
+  .sort((a, b) => (b.rank - a.rank) || ((b.order ?? 99) - (a.order ?? 99)));
+
+// 1つの枠に付ける称号。v は "auto"(おまかせ) / null(なし) / {id, shape}
+function pickTitle(owned, v, slot) {
+  if (v === null) return null;
+  const item = v && v !== "auto" ? owned.find(e => e.id === v.id) : null;
+  if (item) {
+    const t = Titles.resolve(item);
+    return t && { ...t, shape: t.fixedShape || v.shape || "rect" };
+  }
+  if (slot === "bottom") return null;                 // 下のおまかせ = なし
+  const t = Titles.best(owned);                       // 上のおまかせ = 一番レアな称号
+  return t && { ...t, shape: t.fixedShape || "rect" };
 }
 
-function achList(p, big) {
-  // 特別な称号が代わりになっているものは出さない
-  const replaced = new Set((p.titles || []).map(t => t.replaces).filter(Boolean));
-  return (p.achievements || []).filter(a => !replaced.has(a.id) && isCurrent(a)).map(a =>
-    `<span class="ach${big ? " big" : ""}" title="${esc(a.label)}">${ACH_ICON}<b>${esc(a.label)}</b></span>`);
+function equippedOf(user, p) {
+  const owned = ownedOf(user, p);
+  const eq = user?.equip || {};
+  const val = (slot) => (slot in eq ? eq[slot] : "auto");
+  return { top: pickTitle(owned, val("top"), "top"), bottom: pickTitle(owned, val("bottom"), "bottom"), owned };
 }
-const achBadges = (p, big) => achList(p, big).join("");
-
-// 順位表に載せる称号。特別な称号 → 達成バッジ の順で一番上の1つだけ出し、
-// 残りの数を +N で添える。全部は選手ページで見られる
-function boardTitles(p) {
-  const all = [
-    ...(p.titles || []).filter(isCurrent).map(t => legendBadges({ titles: [t] })),
-    ...achList(p),
-  ];
-  if (!all.length) return "";
-  return `<span class="plate-titles">${all[0]}${
-    all.length > 1 ? `<span class="t-more">+${all.length - 1}</span>` : ""}</span>`;
-}
+const titleHtml = (t, big) => t ? Titles.html(t, { big }) : "";
 
 // ---- デッキコピー ----
 // クラロワ公式のデッキ共有リンク。開くとゲームが起動してデッキがコピーされる。
@@ -1178,12 +1093,12 @@ function boardEntries() {
     const name = u.displayName || accs[0]?.acc.name || "?";
     const have = accs.filter(x => x.p);
     if (!have.length) {                       // 登録したばかりで、まだ集計されていない
-      out.push({ tag: accs[0]?.acc.tag || "", label: name, name, pending: true });
+      out.push({ tag: accs[0]?.acc.tag || "", label: name, name, pending: true, _user: u });
       continue;
     }
     have.sort((x, y) => (leagueOf(y.p) - leagueOf(x.p)) || (rateOf(y.p) - rateOf(x.p))
       || ((y.acc.role === "main") - (x.acc.role === "main")));
-    out.push({ ...have[0].p, label: name });
+    out.push({ ...have[0].p, label: name, _user: u });
   }
   for (const p of index?.players || []) if (!claimed.has(clean(p.tag))) out.push(p);
   return out;
@@ -1204,15 +1119,17 @@ function drawBoard() {
     const ok = m.has(p);
     const rankCls = ok && i === 0 ? " gold" : ok && i === 1 ? " silver" : ok && i === 2 ? " bronze" : "";
     const wide = m.wide && m.wide(p) ? " text" : "";
+    const eq = equippedOf(p._user || null, p);
     return `<button class="plate${rankCls}" data-tag="${esc(clean(p.tag))}">
       <span class="medal display">${i + 1}</span>
       ${shieldHtml(p.leagueNumber, "shield")}
       <span class="plate-body">
-        ${boardTitles(p)}
+        ${eq.top ? `<span class="plate-titles">${titleHtml(eq.top)}</span>` : ""}
         <span class="plate-name">${esc(p.label || p.name)}</span>
         <span class="plate-sub">${esc(m.sub(p))}${
           groupFilter === "ALL" && groupsOf(p).length
             ? ` · ${esc(groupsOf(p).join("/"))}` : ""}</span>
+        ${eq.bottom ? `<span class="plate-titles bottom">${titleHtml(eq.bottom)}</span>` : ""}
       </span>
       <span class="plate-value${ok ? wide : " none"}">${ok ? m.show(p) : "—"}</span>
     </button>`;
@@ -1472,6 +1389,8 @@ function drawPlayer() {
     return;
   }
 
+  const eq = equippedOf(owner, p);
+  const shelf = byRarity(eq.owned).map(t => titleHtml({ ...t, shape: t.fixedShape || "rect" })).join("");
   const per = p.periods || {};
   const tile = (cap, num, color) =>
     `<div class="tile"><div class="tile-num" style="color:${color}">${num}</div><div class="tile-cap">${esc(cap)}</div></div>`;
@@ -1537,12 +1456,13 @@ function drawPlayer() {
 
   $main.innerHTML = `
     <div class="banner">
+      ${eq.top ? `<div class="title-row">${titleHtml(eq.top, true)}</div>` : ""}
       <div class="banner-name display outlined">${esc(owner?.displayName || p.name)}</div>
       ${owner?.displayName && owner.displayName !== p.name ? `<div class="banner-sub">ゲーム内の名前: ${esc(p.name)}</div>` : ""}
       ${p.clan ? `<div class="banner-clan">${esc(p.clan)}</div>` : ""}
-      ${(p.titles || []).length ? `<div class="legend-row">${legendBadges(p, true)}</div>` : ""}
-      ${achBadges(p, true) ? `<div class="ach-row">${achBadges(p, true)}</div>` : ""}
-      ${pastChallenges(p)}
+      ${eq.bottom ? `<div class="title-row under">${titleHtml(eq.bottom, true)}</div>` : ""}
+      ${shelf ? `<button class="cr-btn shelf-btn" id="shelf">持っている称号 ${eq.owned.length}個 ${shelfOpen ? "▲" : "▼"}</button>
+        ${shelfOpen ? `<div class="title-shelf">${shelf}</div>` : ""}` : ""}
       ${accSwitch}
       ${shieldHtml(p.leagueNumber, "banner-shield")}
       <div class="banner-league">${esc(leagueName(p.leagueNumber))}</div>
@@ -1617,8 +1537,12 @@ function drawPlayer() {
   });
   const more = document.getElementById("more");
   if (more) more.onclick = () => { shown += PAGE; draw(); };
+  const $shelf = document.getElementById("shelf");
+  if ($shelf) $shelf.onclick = () => { shelfOpen = !shelfOpen; draw(); };
   bindAccSwitch();
 }
+
+let shelfOpen = false;
 
 function bindAccSwitch() {
   $main.querySelectorAll("[data-acc]").forEach(b => { b.onclick = () => openPlayer(b.dataset.acc); });
@@ -1628,6 +1552,20 @@ function bindAccSwitch() {
 // 表示名と、ゲームアカウント(メイン1つ+サブ2つまで)の登録。
 // 追加は確認なし。1つのアカウントは1人にしか登録できず、間違いは管理人が外せる。
 let profileData = null, adminData = null, profileMsg = { err: "", ok: "" };
+// 称号: 持っている称号と付けている称号 / 編集中の内容 / 管理人の一覧
+let titleData = null, titleEdit = null, titleSlot = "top", titleMsg = { err: "", ok: "" };
+let adminTitles = null, grantForm = { discordId: "", label: "", sub: "", year: "", design: "zap", shape: "" };
+
+function startTitleEdit() {
+  const eq = titleData?.equip || {};
+  titleEdit = { top: "top" in eq ? eq.top : "auto", bottom: "bottom" in eq ? eq.bottom : null };
+}
+
+async function loadTitleStuff() {
+  titleData = await api("/api/titles");
+  startTitleEdit();
+  if (profileData?.me?.admin) adminTitles = await api("/api/admin/titles");
+}
 
 async function openProfile() {
   view = "profile"; profileMsg = { err: "", ok: "" }; adminData = null;
@@ -1635,6 +1573,7 @@ async function openProfile() {
   try {
     profileData = await api("/api/profile");
     if (profileData.me?.admin) adminData = await api("/api/admin/accounts");
+    await loadTitleStuff();
   } catch (e) { profileMsg.err = e.message; }
   draw();
 }
@@ -1646,6 +1585,7 @@ async function afterProfileChange(data, okMsg) {
     if (profileData.me) currentUser = profileData.me;
     adminData = profileData.me?.admin ? (data.me ? await api("/api/admin/accounts") : data) : null;
     roster = await loadData("roster.json");
+    await loadTitleStuff();
   } catch {}
   profileMsg = { err: "", ok: okMsg || "" };
   draw();
@@ -1709,6 +1649,8 @@ function drawProfile() {
       ${profileMsg.err ? `<p class="err">${esc(profileMsg.err)}</p>` : ""}
       ${profileMsg.ok ? `<p class="ok">${esc(profileMsg.ok)}</p>` : ""}
     </div>
+    ${titleBox(who)}
+    ${adminTitles ? grantBox() : ""}
     ${adminData ? `<div class="pf">
       <h3>管理(全員の登録)</h3>
       <p class="note"><a href="/lab/titles/" style="color:var(--gold-lite)">称号ラボ</a> で称号の見た目を試せます。</p>
@@ -1749,6 +1691,165 @@ function drawProfile() {
     b.onclick = () => {
       if (!confirm("このアカウントを外しますか？(戦績の記録は消えません)")) return;
       run(() => api("/api/accounts/remove", { tag: b.dataset.remove }), "外しました");
+    };
+  });
+  bindTitleBox();
+  bindGrantBox();
+}
+
+// ---- プロフィール: 称号を付ける ----
+// 上(名前の上)と下(名前の下)に1つずつ。形は自由(炎の枠は選べない。管理人が形を決めた称号はその形)
+const USER_SHAPES = Titles.SHAPES.filter(x => x.id !== "blaze");
+
+function titleBox(who) {
+  if (!titleData || !titleEdit) return "";
+  const owned = titleData.owned || [];
+  const list = byRarity(owned);
+  const v = titleEdit[titleSlot];
+  const cur = v && v !== "auto" ? list.find(t => t.id === v.id) : null;
+  const top = pickTitle(owned, titleEdit.top, "top");
+  const bottom = pickTitle(owned, titleEdit.bottom, "bottom");
+
+  const choice = (val, inner, on) => `<button class="tchoice${on ? " on" : ""}" data-tc="${esc(val)}">${inner}</button>`;
+  const choices = [
+    titleSlot === "top" ? choice("auto", "おまかせ(一番レアなもの)", v === "auto") : "",
+    choice("none", "なし", v === null || (titleSlot === "bottom" && v === "auto")),
+    ...list.map(t => choice(t.id, titleHtml({ ...t, shape: t.fixedShape || "rect" }), cur?.id === t.id)),
+  ].join("");
+
+  let shapes = "";
+  if (cur && cur.fixedShape) {
+    shapes = `<p class="note">この称号は形が決まっています。</p>`;
+  } else if (cur) {
+    shapes = `<div class="t-choices">${USER_SHAPES.map(sh =>
+      `<button class="tchoice${(v.shape || "rect") === sh.id ? " on" : ""}" data-tsh="${sh.id}">${
+        titleHtml({ ...cur, shape: sh.id })}</button>`).join("")}</div>`;
+  }
+
+  const have = new Set(owned.map(e => e.id.replace(/^crl20-\d{4}$/, "crl20")));
+  const catalog = Titles.CATS.map(c => `<div class="t-cat">${esc(c.name)}</div><div class="t-cat-list">${
+    Titles.CATALOG.filter(x => x.cat === c.id).map(x => {
+      const r = Titles.RARITY[x.rarity];
+      const shown = { label: x.label, design: r.design };
+      return `<div class="t-item${have.has(x.id) ? "" : " locked"}">${titleHtml(shown)}
+        <span class="t-rar">${esc(r.name)}</span><small>${esc(x.how)}</small></div>`;
+    }).join("")}</div>`).join("");
+
+  return `<div class="pf">
+    <h3>称号</h3>
+    <p class="note">持っている称号を、名前の上と下に1つずつ付けられます。称号はアカウントの成績で自動で付きます(10分ごとに更新)。</p>
+    <div class="t-preview">
+      <span class="plate-body">
+        ${top ? `<span class="plate-titles">${titleHtml(top)}</span>` : ""}
+        <span class="plate-name">${esc(who?.name || "")}</span>
+        ${bottom ? `<span class="plate-titles bottom">${titleHtml(bottom)}</span>` : ""}
+      </span>
+    </div>
+    <div class="t-tabs">
+      <button class="cr-btn${titleSlot === "top" ? " on" : ""}" data-tslot="top">上の称号</button>
+      <button class="cr-btn${titleSlot === "bottom" ? " on" : ""}" data-tslot="bottom">下の称号</button>
+    </div>
+    ${list.length ? "" : `<p class="note">まだ称号がありません。アカウントを登録すると、成績に合わせて付きます。</p>`}
+    <div class="t-choices">${choices}</div>
+    ${shapes ? `<div class="t-label">形</div>${shapes}` : ""}
+    <div style="margin-top:12px"><button class="cr-btn go gold" id="t-save">この称号で保存</button></div>
+    ${titleMsg.err ? `<p class="err">${esc(titleMsg.err)}</p>` : ""}
+    ${titleMsg.ok ? `<p class="ok">${esc(titleMsg.ok)}</p>` : ""}
+    <details style="margin-top:14px"><summary class="note" style="cursor:pointer">称号の一覧と、付く条件</summary>${catalog}</details>
+  </div>`;
+}
+
+function bindTitleBox() {
+  if (!titleEdit) return;
+  $main.querySelectorAll("[data-tslot]").forEach(b => {
+    b.onclick = () => { titleSlot = b.dataset.tslot; titleMsg = { err: "", ok: "" }; draw(); };
+  });
+  $main.querySelectorAll("[data-tc]").forEach(b => {
+    b.onclick = () => {
+      const val = b.dataset.tc;
+      const old = titleEdit[titleSlot];
+      titleEdit[titleSlot] = val === "auto" ? "auto" : val === "none" ? null
+        : { id: val, shape: (old && old !== "auto" && old.shape) || "rect" };
+      titleMsg = { err: "", ok: "" }; draw();
+    };
+  });
+  $main.querySelectorAll("[data-tsh]").forEach(b => {
+    b.onclick = () => { titleEdit[titleSlot] = { ...titleEdit[titleSlot], shape: b.dataset.tsh }; draw(); };
+  });
+  const save = document.getElementById("t-save");
+  if (save) save.onclick = async () => {
+    titleMsg = { err: "", ok: "" };
+    try {
+      const enc = (v) => v === "auto" ? "auto" : v === null ? null : { id: v.id, shape: v.shape || "rect" };
+      titleData = await api("/api/titles/equip", { top: enc(titleEdit.top), bottom: enc(titleEdit.bottom) });
+      startTitleEdit();
+      roster = await loadData("roster.json");
+      titleMsg.ok = "称号を保存しました。順位表にもすぐ出ます";
+    } catch (e) { titleMsg.err = e.message; }
+    draw();
+  };
+}
+
+// ---- 管理人: ユニーク称号を付ける ----
+function grantBox() {
+  const f = grantForm;
+  const users = adminTitles.users || [];
+  const sample = { label: f.label || "称号の文字", sub: f.sub, year: f.year, design: f.design, shape: f.shape || "rect" };
+  return `<div class="pf">
+    <h3>管理(ユニーク称号を付ける)</h3>
+    <p class="note">ここで付けた称号はレアリティ「ユニーク」になります。形を決めると、本人は形を変えられません(炎の枠はここでだけ選べます)。</p>
+    <div class="pf-grid">
+      <select id="g-user"><option value="">付ける人</option>${users.map(u =>
+        `<option value="${esc(u.id)}"${u.id === f.discordId ? " selected" : ""}>${esc(u.name || u.id)}</option>`).join("")}</select>
+      <button class="cr-btn" id="g-4000">「レート4000到達」を入れる</button>
+    </div>
+    <div class="pf-row" style="margin-top:6px"><input id="g-label" maxlength="20" placeholder="称号の文字" value="${esc(f.label)}"></div>
+    <div class="pf-grid" style="margin-top:6px">
+      <input id="g-sub" maxlength="24" placeholder="小見出し(英字など・任意)" value="${esc(f.sub)}">
+      <input id="g-year" maxlength="8" placeholder="年(任意)" value="${esc(f.year)}">
+      <select id="g-design">${Titles.DESIGNS.map(d =>
+        `<option value="${d.id}"${d.id === f.design ? " selected" : ""}>${esc(d.name)}</option>`).join("")}</select>
+      <select id="g-shape"><option value="">形: 本人が選ぶ</option>${Titles.SHAPES.map(sh =>
+        `<option value="${sh.id}"${sh.id === f.shape ? " selected" : ""}>形: ${esc(sh.name)}</option>`).join("")}</select>
+    </div>
+    <div class="title-row">${titleHtml(sample)}</div>
+    <div class="title-row">${titleHtml(sample, true)}</div>
+    <button class="cr-btn go gold" id="g-add">この称号を付ける</button>
+    <div class="t-label">付けた称号</div>
+    ${(adminTitles.grants || []).map(g => `<div class="acc">
+      <span class="acc-body"><span style="display:block;margin-bottom:4px">${titleHtml({ ...g, shape: g.shape || "rect" })}</span><small>${esc(g.userName || g.userId)} に付けた</small></span>
+      <span class="acc-btns"><button class="cr-btn" data-revoke="${esc(g.id)}">外す</button></span>
+    </div>`).join("") || `<p class="note">まだありません。</p>`}
+  </div>`;
+}
+
+function bindGrantBox() {
+  if (!adminTitles) return;
+  const $ = (id) => document.getElementById(id);
+  const sync = () => {
+    grantForm = { discordId: $("g-user").value, label: $("g-label").value, sub: $("g-sub").value,
+                  year: $("g-year").value, design: $("g-design").value, shape: $("g-shape").value };
+  };
+  ["g-user", "g-design", "g-shape"].forEach(id => { $(id).onchange = () => { sync(); draw(); }; });
+  ["g-label", "g-sub", "g-year"].forEach(id => { $(id).onchange = () => { sync(); draw(); }; });
+  $("g-4000").onclick = () => { sync(); grantForm.label = "レート4000到達"; draw(); };
+  $("g-add").onclick = async () => {
+    sync();
+    profileMsg = { err: "", ok: "" };
+    try {
+      adminTitles = await api("/api/admin/titles/grant", grantForm);
+      grantForm = { ...grantForm, label: "", sub: "", year: "" };
+      roster = await loadData("roster.json");
+      profileMsg.ok = "称号を付けました";
+    } catch (e) { profileMsg.err = e.message; }
+    draw();
+  };
+  $main.querySelectorAll("[data-revoke]").forEach(b => {
+    b.onclick = async () => {
+      if (!confirm("この称号を外しますか？")) return;
+      try { adminTitles = await api("/api/admin/titles/revoke", { id: b.dataset.revoke }); roster = await loadData("roster.json"); }
+      catch (e) { profileMsg.err = e.message; }
+      draw();
     };
   });
 }
