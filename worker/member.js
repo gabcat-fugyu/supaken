@@ -146,9 +146,22 @@ async function discordCallback(request, env) {
 
   // そのサーバーでの自分のロール(サーバーに入っていなければ 404)
   const extra = String(env.DISCORD_EXTRA_IDS || "").split(",").map((s) => s.trim()).filter(Boolean);
-  // 管理人が許可した人は、ロールが無くても(サーバーに入っていなくても)入れる
+  // 管理人が許可した人は、ロールが無くても(サーバーに入っていなくても)入れる。
+  // 許可はユーザーID か ユーザー名(@の後ろ)。名前で許可した人は、初めて入ったときにIDに置き換える
+  const uname = String(user.username || "").toLowerCase();
   let allowed = extra.includes(user.id)
     || !!(await env.DB.prepare("SELECT id FROM allowed_users WHERE id = ?").bind(user.id).first());
+  if (!allowed && uname) {
+    const byName = await env.DB.prepare("SELECT id, name FROM allowed_users WHERE id = ?").bind(uname).first();
+    if (byName) {
+      allowed = true;
+      await env.DB.batch([
+        env.DB.prepare("INSERT OR IGNORE INTO allowed_users (id, name, added_at) VALUES (?, ?, ?)")
+          .bind(user.id, byName.name || "@" + uname, new Date().toISOString()),
+        env.DB.prepare("DELETE FROM allowed_users WHERE id = ?").bind(uname),
+      ]);
+    }
+  }
   let nick = null;
   if (!allowed) {
     const memRes = await fetch(`${DISCORD}/users/@me/guilds/${env.DISCORD_GUILD_ID}/member`, { headers: auth });
@@ -397,8 +410,12 @@ async function adminGuests(env) {
 
 async function adminGuestAdd(request, env) {
   const b = await readBody(request);
-  const gid = String(b.id || "").trim();
-  if (!/^\d{15,21}$/.test(gid)) return fail(400, "Discord のユーザーID(数字)を入れてください");
+  // ユーザーID(数字) か ユーザー名(英小文字・数字・_ と .)
+  const raw = String(b.id || "").trim().replace(/^@/, "");
+  const gid = /^\d{15,21}$/.test(raw) ? raw : raw.toLowerCase();
+  if (!/^\d{15,21}$/.test(gid) && !/^[a-z0-9_.]{2,32}$/.test(gid)) {
+    return fail(400, "Discord のユーザー名かユーザーIDを入れてください");
+  }
   const name = String(b.name || "").trim().slice(0, 32) || null;     // 覚え書き(誰か分かるように)
   await env.DB.prepare(
     `INSERT INTO allowed_users (id, name, added_at) VALUES (?, ?, ?)

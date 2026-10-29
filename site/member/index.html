@@ -647,8 +647,8 @@ async function api(path, body) {
 
 // Discord から戻ってきたときの理由(?login=...)
 const LOGIN_MESSAGES = {
-  role: "スパ研のメン限ロールが確認できませんでした。メンバーシップに入っているか、Discord のアカウントが合っているか確かめてください。メンバー以外の人は、管理人に Discord のユーザーIDを伝えて許可してもらうと入れます。",
-  guild: "スパ研の Discord サーバーに入っていないようです。先にサーバーに参加してください。メンバー以外の人は、管理人に Discord のユーザーIDを伝えて許可してもらうと入れます。",
+  role: "スパ研のメン限ロールが確認できませんでした。メンバーシップに入っているか、Discord のアカウントが合っているか確かめてください。メンバー以外の人は、管理人に Discord のユーザー名を伝えて許可してもらうと入れます。",
+  guild: "スパ研の Discord サーバーに入っていないようです。先にサーバーに参加してください。メンバー以外の人は、管理人に Discord のユーザー名を伝えて許可してもらうと入れます。",
   cancel: "ログインをキャンセルしました。",
   expired: "時間がたちすぎたので、もう一度ログインしてください。",
   error: "Discord とのやり取りに失敗しました。少し待ってからもう一度試してください。",
@@ -1733,16 +1733,17 @@ function drawProfile() {
 function guestBox() {
   return `<div class="pf">
     <h3>管理(メンバー以外で入れる人)</h3>
-    <p class="note">ここに入れた人は、メン限ロールが無くても(サーバーに入っていなくても) Discord でログインして入れます。外すとすぐ入れなくなります。</p>
+    <p class="note">Discord のユーザー名(@の後ろ)かユーザーIDで許可します。許可した人は、メン限ロールが無くても(サーバーに入っていなくても) Discord でログインして入れます。外すとすぐ入れなくなります。</p>
     <div class="pf-grid">
-      <input id="guest-id" inputmode="numeric" placeholder="Discord のユーザーID">
+      <input id="guest-id" autocapitalize="none" placeholder="Discord のユーザー名かID">
       <input id="guest-name" maxlength="32" placeholder="誰か(覚え書き・任意)">
     </div>
     <div style="margin-top:6px"><button class="cr-btn go gold" id="guest-add">許可する</button></div>
     <div class="t-label">許可している人</div>
     ${(adminGuests.allowed || []).map(a => `<div class="acc">
-      <span class="acc-body"><b>${esc(a.name || a.memo || "(まだログインしていません)")}</b><small>${
-        a.memo && a.name ? `${esc(a.memo)} · ` : ""}ID ${esc(a.id)}${a.lastLogin ? "" : " · まだログインしていません"}</small></span>
+      <span class="acc-body"><b>${esc(a.name || a.memo || (/^\d+$/.test(a.id) ? "(名前不明)" : "@" + a.id))}</b><small>${
+        a.memo && a.name ? `${esc(a.memo)} · ` : ""}${/^\d+$/.test(a.id) ? `ID ${esc(a.id)}` : `ユーザー名 @${esc(a.id)}`}${
+        a.lastLogin ? "" : " · まだログインしていません"}</small></span>
       <span class="acc-btns"><button class="cr-btn" data-guest-remove="${esc(a.id)}">外す</button></span>
     </div>`).join("") || `<p class="note">まだいません。</p>`}
   </div>`;
