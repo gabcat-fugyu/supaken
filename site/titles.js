@@ -65,7 +65,6 @@ window.Titles = (function () {
       // 炎の枠: 絵を3枚並べる。左の飾りに宝石があるのでアイコンは付けない
       return `<span class="bz bz-${d.id}${opts.big ? " big" : ""}" title="${esc(t.label)}">` +
         `<i class="bz-g"></i><i class="bz-l"></i><i class="bz-m"></i><i class="bz-r"></i>` +
-        `<i class="bz-sh"></i><i class="bz-e"></i><i class="bz-e bz-e2"></i>` +
         `<span class="bz-text">${subText ? `<span class="ttl-sub">${esc(subText)}</span>` : ""}` +
         `<b>${esc(t.label)}</b></span></span>`;
     }
