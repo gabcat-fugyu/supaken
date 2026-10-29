@@ -1,0 +1,880 @@
+"""クラロワの対戦ログを定期取得して JSON に貯めるスクリプト。
+
+GitHub Actions から定期実行される前提。公式APIは直近25試合しか返さないので、
+実行のたびに「まだ持っていない試合」だけを追記していく。
+
+追跡する人は players.json で管理する。トークンは自分の1つで足りる
+(プレイヤー情報は公開データなので、相手のトークンは不要)。
+
+サイト側でランキングを軽く描けるよう、期間別の集計(今日/3日/7日の
+試合数と勝率)はここで計算して index.json に入れておく。
+
+必要な環境変数:
+    CR_API_TOKEN  developer.clashroyale.com で発行したトークン
+"""
+
+import json
+import os
+import re
+import sys
+import time
+import urllib.error
+import urllib.request
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+# 公式APIはトークンにIP制限がかかる。GitHub ActionsのIPは毎回変わるので、
+# 固定IPを持つRoyaleAPIの中継プロキシを経由する。
+# (トークンの許可IP欄に 45.79.218.79 を登録しておくこと)
+API_BASE = "https://proxy.royaleapi.dev/v1"
+
+# 「今日」の判定は日本時間で行う
+JST = timezone(timedelta(hours=9))
+
+# ---- データの保持期間 ----
+# 放っておくと際限なく増えるので、古い分は間引く。
+# 環境変数で上書きできるようにしておく。
+KEEP_BATTLE_DAYS = int(os.environ.get("KEEP_BATTLE_DAYS", "180"))   # 対戦履歴を残す日数
+MAX_BATTLES = int(os.environ.get("MAX_BATTLES", "3000"))            # 1人あたりの上限試合数
+RECENT_BATTLES = int(os.environ.get("RECENT_BATTLES", "100"))       # 画面に出す直近の試合数
+# レート推移はシーズンが変わるたびに捨てるので、シーズン内(最長5週ほど)は
+# 全部残しておける。念のため上限だけ持たせる。
+FULL_TROPHY_DAYS = int(os.environ.get("FULL_TROPHY_DAYS", "45"))    # レート推移を全点残す日数
+KEEP_TROPHY_DAYS = int(os.environ.get("KEEP_TROPHY_DAYS", "60"))    # それ以前は1日1点にして残す日数
+
+# ---- シーズンの区切り ----
+# クラロワのシーズンは「第1月曜の18時」から次の第1月曜まで。
+# ここが変わるとレートがリセットされ、全員マスターIから始まる。
+SEASON_RESET_HOUR = int(os.environ.get("SEASON_RESET_HOUR", "18"))
+RESET_LEAGUE = 1  # リセット後のリーグ = マスターI
+
+# ---- 達成バッジ ----
+# チャレンジで目標の勝利数に届いた人に、順位表でバッジを付ける。
+# 判定は次のどちらかで行う(早く分かる方で付く)。
+#   eventTag + wins : 対戦ログのイベント識別子と、その勝利数
+#   badge           : クラロワのプロフィールに付くバッジ名
+# year はチャレンジの年。順位表に出すのは一番新しい年のものだけで、
+#   それより前の年は選手ページの「20勝達成 (2026)」に自動で回る。
+#   来年のチャレンジが始まったら、ここに新しい年の行を1行足すだけでよい。
+# aliases は昔使っていた id。保存済みの達成を引き継ぐ。
+# 一度達成した人は、その試合が直近のログから消えても達成のまま残る。
+ACHIEVEMENTS = [
+    # CRL 20勝チャレンジ 2026
+    {"id": "crl20-2026", "label": "20勝達成", "eventTag": "#2CJUG2VL", "wins": 20,
+     "badge": "Crl20Wins2026", "year": 2026, "aliases": ["shocktober-20"]},
+]
+
+ROOT = Path(__file__).parent
+PLAYERS_FILE = ROOT / "players.json"
+DATA_DIR = ROOT / "data"
+INDEX_FILE = DATA_DIR / "index.json"
+
+
+def inspect_token(token: str):
+    """トークンの見た目をチェックして診断情報を表示する(中身は漏らさない)。"""
+    print("--- トークン診断 ---")
+    print(f"  長さ: {len(token)} 文字")
+    if len(token) < 20:
+        print("  警告: 短すぎます。コピーが途中で切れている可能性大")
+    if len(token) >= 8:
+        print(f"  先頭4文字: {token[:4]}... / 末尾4文字: ...{token[-4:]}")
+
+    bad_chars = [c for c in token if c in (" ", "\n", "\t", "\r")]
+    if bad_chars:
+        print(f"  警告: トークン内部に空白/改行らしき文字が {len(bad_chars)} 個あります")
+    else:
+        print("  内部の空白/改行: なし(OK)")
+
+    if re.fullmatch(r"[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", token):
+        print("  形式: JWTらしき3分割構造(OK)")
+    else:
+        print("  警告: 想定したJWT形式(xxx.yyy.zzz)に見えません。貼り付けミスの可能性")
+    print("--------------------")
+
+
+RETRIES = 3          # 一時的な失敗(混雑・通信エラー)は数回やり直す
+RETRY_WAIT = 3       # やり直すまでの秒数(回数に応じて伸ばす)
+
+
+def api_get(path: str, token: str):
+    """APIを叩いてJSONを返す。取得できなければ None。
+
+    中継サーバーはたまに 429 / 5xx / タイムアウトを返す。
+    そのまま諦めるとその人がランキングから消えるので、少し待ってやり直す。
+    """
+    for attempt in range(1, RETRIES + 1):
+        result, retry = _api_get_once(path, token)
+        if not retry:
+            return result
+        if attempt < RETRIES:
+            wait = RETRY_WAIT * attempt
+            print(f"    {wait}秒待ってやり直します ({attempt}/{RETRIES - 1})", file=sys.stderr)
+            time.sleep(wait)
+    return None
+
+
+def _api_get_once(path: str, token: str):
+    """1回だけ叩く。(結果, やり直すべきか) を返す。"""
+    req = urllib.request.Request(
+        f"{API_BASE}{path}",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+            # RoyaleAPIの中継サーバーはCloudflareの背後にあり、Pythonの
+            # デフォルトUser-Agent (Python-urllib/3.x) だと bot 扱いで
+            # 弾かれる (error_1010 / browser_signature_banned)。
+            # ブラウザっぽい値にして回避する。
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as res:
+            return json.loads(res.read().decode("utf-8")), False
+    except urllib.error.HTTPError as e:
+        body = ""
+        try:
+            body = e.read().decode("utf-8", errors="replace")
+        except Exception:
+            pass
+
+        if e.code == 403:
+            print("  --- 403の詳細 ---")
+            print(f"  リクエストURL: {API_BASE}{path}")
+            print(f"  APIが返した中身: {body[:500]}")
+            print("  ------------------")
+            raise SystemExit(
+                "403: トークン/IP設定、またはCloudflareのbot判定"
+                "(browser_signature_banned等)が原因の可能性があります"
+            )
+        if e.code == 404:
+            print(f"  スキップ: タグが見つかりません ({path})", file=sys.stderr)
+            return None, False
+        if e.code == 429:
+            print(f"  失敗: レート制限 ({path})", file=sys.stderr)
+            return None, True
+        print(f"  失敗: APIエラー {e.code} ({path}) / 返答: {body[:200]}", file=sys.stderr)
+        return None, e.code >= 500
+    except urllib.error.URLError as e:
+        print(f"  失敗: 通信エラー {e.reason} ({path})", file=sys.stderr)
+        return None, True
+    except (TimeoutError, ConnectionError, OSError) as e:
+        # 読み込み途中のタイムアウトは URLError にならず素で飛んでくる
+        print(f"  失敗: 通信エラー {type(e).__name__} ({path})", file=sys.stderr)
+        return None, True
+    except json.JSONDecodeError:
+        print(f"  失敗: 返答がJSONではありません ({path})", file=sys.stderr)
+        return None, True
+
+
+def load_json(path: Path, default):
+    """既存のJSONを読む。無ければ default を返す。"""
+    if not path.exists():
+        return default
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        print(f"  警告: {path.name} が壊れているため初期化します ({e})", file=sys.stderr)
+        return default
+
+
+def save_json(path: Path, data, compact: bool = True):
+    """JSONを書き出す。
+
+    アプリがスマホで読み込むので、既定では改行や字下げを入れずに詰めて書く
+    (字下げだけでファイルが1.5倍くらいに膨らむ)。
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    text = (
+        json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+        if compact
+        else json.dumps(data, ensure_ascii=False, indent=2)
+    )
+    path.write_text(text + "\n", encoding="utf-8")
+
+
+# ---- 画面用の直近ログ(recent.json)の圧縮 ----
+# 対戦ログはカード1枚ごとに名前・画像URL・コストなどが毎回入っていて、
+# 100試合で1MBほどになる。カードごとに変わらない情報は1か所にまとめ、
+# 試合の中にはカードIDとレベルなど試合ごとに変わる値だけを残す。
+CARD_STATIC = ("name", "rarity", "elixirCost", "maxLevel", "maxEvolutionLevel", "iconUrls")
+RECENT_FORMAT = 2
+
+
+def pack_recent(battles):
+    cards = {}
+
+    def pack_list(lst):
+        out = []
+        for c in lst or []:
+            cid = c.get("id")
+            if cid is None:
+                out.append(c)          # IDが無いものはそのまま残す
+                continue
+            entry = cards.setdefault(str(cid), {})
+            for k in CARD_STATIC:
+                if k == "iconUrls":
+                    if c.get("iconUrls"):
+                        entry.setdefault("iconUrls", {}).update(c["iconUrls"])
+                elif k in c and k not in entry:
+                    entry[k] = c[k]
+            out.append({k: v for k, v in c.items() if k not in CARD_STATIC})
+        return out
+
+    packed = []
+    for b in battles:
+        nb = dict(b)
+        for side in ("team", "opponent"):
+            players = []
+            for pl in b.get(side) or []:
+                q = dict(pl)
+                if "cards" in q:
+                    q["cards"] = pack_list(q["cards"])
+                if "supportCards" in q:
+                    q["supportCards"] = pack_list(q["supportCards"])
+                players.append(q)
+            nb[side] = players
+        packed.append(nb)
+    return {"format": RECENT_FORMAT, "cards": cards, "battles": packed}
+
+
+def unpack_recent(data):
+    """pack_recent の逆。昔の形式(試合の配列そのまま)もそのまま読める。"""
+    if isinstance(data, list):
+        return data
+    if not isinstance(data, dict):
+        return []
+    cards = data.get("cards") or {}
+
+    def unpack_list(lst):
+        return [{**cards.get(str(c.get("id")), {}), **c} for c in lst or []]
+
+    battles = []
+    for b in data.get("battles") or []:
+        nb = dict(b)
+        for side in ("team", "opponent"):
+            players = []
+            for pl in b.get(side) or []:
+                q = dict(pl)
+                if "cards" in q:
+                    q["cards"] = unpack_list(q["cards"])
+                if "supportCards" in q:
+                    q["supportCards"] = unpack_list(q["supportCards"])
+                players.append(q)
+            nb[side] = players
+        battles.append(nb)
+    return battles
+
+
+def battle_key(battle: dict) -> str:
+    """試合を一意に識別するキー。開始時刻＋自分のタグで十分区別できる。"""
+    team = battle.get("team") or [{}]
+    return f"{battle.get('battleTime', '')}_{team[0].get('tag', '')}"
+
+
+def parse_battle_time(raw: str):
+    """20260806T083000.000Z 形式を datetime に変換する。"""
+    if not raw:
+        return None
+    try:
+        return datetime.strptime(raw[:15], "%Y%m%dT%H%M%S").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def battle_result(battle: dict, tag: str):
+    """その試合が勝ちかどうかを返す。判定できなければ None。"""
+    team = battle.get("team") or []
+    opponent = battle.get("opponent") or []
+    if not team or not opponent:
+        return None
+
+    me = next(
+        (p for p in team if str(p.get("tag", "")).lstrip("#").upper() == tag), team[0]
+    )
+    my_crowns = me.get("crowns")
+    opp_crowns = opponent[0].get("crowns")
+    if my_crowns is None or opp_crowns is None:
+        return None
+    if my_crowns == opp_crowns:
+        return None  # 引き分けは勝率の母数から外す
+    return my_crowns > opp_crowns
+
+
+def season_start(year: int, month: int) -> datetime:
+    """その月のシーズン開始時刻(第1月曜の18時 日本時間)を返す。"""
+    d = datetime(year, month, 1, tzinfo=JST)
+    while d.weekday() != 0:  # 0 = 月曜
+        d += timedelta(days=1)
+    return d.replace(hour=SEASON_RESET_HOUR)
+
+
+def season_key(now: datetime = None) -> str:
+    """今がどのシーズンかを "YYYY-MM" で返す。"""
+    now = (now or datetime.now(timezone.utc)).astimezone(JST)
+    if now < season_start(now.year, now.month):
+        # まだ今月のシーズンが始まっていない = 先月のシーズンの続き
+        y, m = (now.year - 1, 12) if now.month == 1 else (now.year, now.month - 1)
+        return f"{y:04d}-{m:02d}"
+    return f"{now.year:04d}-{now.month:02d}"
+
+
+def looks_stale(pol: dict, player: dict, pending: dict) -> bool:
+    """シーズンが変わったのに、APIがまだ前シーズンの値を返しているか。
+
+    リセット直前の値と完全に一致していれば、まだ更新されていないとみなす。
+    1試合でもすれば battleCount が動くので、そこで解除される。
+    """
+    if not pending:
+        return False
+    return (
+        pol.get("leagueNumber") == pending.get("leagueNumber")
+        and pol.get("trophies") == pending.get("rating")
+        and player.get("battleCount") == pending.get("battleCount")
+    )
+
+
+def period_stats(history, tag: str):
+    """今日/3日/7日それぞれの試合数と勝率を集計する。"""
+    now = datetime.now(timezone.utc)
+    today_start = (
+        now.astimezone(JST)
+        .replace(hour=0, minute=0, second=0, microsecond=0)
+        .astimezone(timezone.utc)
+    )
+
+    windows = {
+        "today": today_start,
+        "d3": now - timedelta(days=3),
+        "d7": now - timedelta(days=7),
+    }
+
+    # 連勝・連敗は古い順に並べて数える
+    timed = []
+    for b in history:
+        when = parse_battle_time(b.get("battleTime", ""))
+        if when is not None:
+            timed.append((when, b))
+    timed.sort(key=lambda x: x[0])
+
+    stats = {}
+    for name, since in windows.items():
+        total = 0
+        wins = 0
+        decided = 0
+        streak_win = streak_lose = 0
+        best_win = best_lose = 0
+        for when, b in timed:
+            if when < since:
+                continue
+            total += 1
+            result = battle_result(b, tag)
+            if result is None:
+                # 引き分けや判定できない試合で連続は途切れる
+                streak_win = streak_lose = 0
+                continue
+            decided += 1
+            if result:
+                wins += 1
+                streak_win += 1
+                streak_lose = 0
+            else:
+                streak_lose += 1
+                streak_win = 0
+            best_win = max(best_win, streak_win)
+            best_lose = max(best_lose, streak_lose)
+        stats[name] = {
+            "battles": total,
+            "wins": wins,
+            "losses": decided - wins,
+            # 引き分けを除いた勝率。判定できる試合が無ければ None
+            "winRate": round(wins / decided * 100, 1) if decided else None,
+            # 期間中の最大連勝・最大連敗
+            "maxWinStreak": best_win,
+            "maxLoseStreak": best_lose,
+        }
+    return stats
+
+
+def slim_battle(b: dict) -> dict:
+    """集計に必要な部分だけ残す。
+
+    対戦ログはカード1枚ずつに画像URLまで入っていて、そのまま貯めると
+    1人で数MBになる。アプリが重くなるので、履歴は集計に使う項目だけにして、
+    画面に出す直近ぶんだけ別ファイル(recent.json)にフル装備で持たせる。
+    """
+    return {
+        "battleTime": b.get("battleTime"),
+        "type": b.get("type"),
+        "team": [
+            {"tag": p.get("tag"), "crowns": p.get("crowns")}
+            for p in (b.get("team") or [])
+        ],
+        "opponent": [
+            {"name": p.get("name"), "crowns": p.get("crowns")}
+            for p in (b.get("opponent") or [])
+        ],
+    }
+
+
+def prune_battles(battles, now):
+    """古すぎる試合と、上限を超えた分を落とす。battlesは新しい順。"""
+    cutoff = now - timedelta(days=KEEP_BATTLE_DAYS)
+    kept = []
+    for b in battles:
+        when = parse_battle_time(b.get("battleTime", ""))
+        # 時刻が読めないものは判断できないので残す
+        if when is None or when >= cutoff:
+            kept.append(b)
+    return kept[:MAX_BATTLES]
+
+
+def compact_trophies(points, now):
+    """レート推移を間引く。
+
+    直近 FULL_TROPHY_DAYS は全部残す。それより古いものは1日1点だけ
+    (その日の最後の記録) に減らし、KEEP_TROPHY_DAYS より古いものは捨てる。
+    """
+    full_from = now - timedelta(days=FULL_TROPHY_DAYS)
+    keep_from = now - timedelta(days=KEEP_TROPHY_DAYS)
+
+    recent = []
+    per_day = {}  # 日付 -> その日の最後の1点
+
+    for p in points:
+        try:
+            when = datetime.fromisoformat(p["time"])
+        except (KeyError, ValueError, TypeError):
+            continue
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=timezone.utc)
+
+        if when >= full_from:
+            recent.append((when, p))
+        elif when >= keep_from:
+            day = when.astimezone(JST).date()
+            prev = per_day.get(day)
+            if prev is None or when >= prev[0]:
+                per_day[day] = (when, p)
+
+    merged = list(per_day.values()) + recent
+    merged.sort(key=lambda x: x[0])
+    return [p for _, p in merged]
+
+
+def same_snapshot(a, b):
+    """レート推移の記録が前回と同じ中身かどうか。"""
+    if not a or not b:
+        return False
+    keys = ("trophies", "rating", "leagueNumber", "battleCount", "wins", "losses")
+    return all(a.get(k) == b.get(k) for k in keys)
+
+
+def probe_leaderboards(token: str):
+    """【一時的な診断】どんなリーダーボードがあるか調べて表示する。
+
+    2v2リーグの順位が取れるか確認したい。公式ドキュメントに載っていなくても
+    実際には返ってくることがあるので、叩いてみる。
+    """
+    print("  ===== リーダーボード診断 =====")
+    data = api_get("/leaderboards", token)
+    if data is None:
+        print("    /leaderboards が取得できませんでした(未対応の可能性)")
+        print("  ==============================")
+        return
+
+    items = data.get("items") or []
+    print(f"    {len(items)}件")
+    for item in items:
+        name = str(item.get("name", ""))
+        mark = " ★2v2かも" if any(h in name.lower() for h in ("2v2", "duo", "2 v 2")) else ""
+        print(f"    id={item.get('id')}  {name}{mark}")
+    print("  ==============================")
+
+
+def probe_fields(player: dict, token: str):
+    """【一時的な診断】2v2リーグのレートと順位がどこにあるか調べる。
+
+    1回目の調査で分かったこと:
+      - プレイヤー情報の progress に "2v2League_YYYYMM" というキーがある
+      - リーダーボード一覧に "2v2 League" が複数(シーズン別?)ある
+    ここではその中身を覗く。分かったらこの関数と呼び出しは消してよい。
+    """
+    print("  ===== 2v2の調査(1人目のみ) =====")
+
+    # --- progress の中身をそのまま出す ---
+    print("  [1] progress の中身:")
+    progress = player.get("progress")
+    if isinstance(progress, dict):
+        for k, v in progress.items():
+            label = k if k else "(空のキー)"
+            print(f"      {label} = {json.dumps(v, ensure_ascii=False)[:400]}")
+    else:
+        print(f"      progress が dict ではありません: {type(progress).__name__}")
+
+    # --- 2v2のリーダーボードの中身を見る ---
+    print("  [2] 2v2リーダーボードの中身:")
+    boards = api_get("/leaderboards", token)
+    items = (boards or {}).get("items") or []
+    duo = [b for b in items if "2v2" in str(b.get("name", "")).lower()]
+    if not duo:
+        print("      2v2のリーダーボードが見つかりません")
+    for b in duo:
+        bid = b.get("id")
+        print(f"      --- id={bid} ({b.get('name')}) ---")
+        data = api_get(f"/leaderboards/{bid}?limit=3", token)
+        if not data:
+            print("        取得できませんでした")
+            continue
+        # 一覧以外の項目(シーズン情報など)も見たい
+        meta = {k: v for k, v in data.items() if k != "items"}
+        if meta:
+            print(f"        付随情報: {json.dumps(meta, ensure_ascii=False)[:300]}")
+        entries = data.get("items") or []
+        print(f"        件数(limit=3で取得): {len(entries)}")
+        for e in entries[:3]:
+            print(f"        {json.dumps(e, ensure_ascii=False)[:300]}")
+
+    print("  ================================")
+
+
+def collect_player(tag: str, label, groups, token: str, probe: bool = False):
+    """1人分を取得して保存する。結果のサマリを返す。"""
+    encoded = f"%23{tag}"
+    player = api_get(f"/players/{encoded}", token)
+    if player is None:
+        return None
+
+    if probe:
+        probe_fields(player, token)
+
+    battles = api_get(f"/players/{encoded}/battlelog", token)
+    if not isinstance(battles, list):
+        battles = []
+
+    player_dir = DATA_DIR / tag
+
+    # --- 対戦履歴のマージ ---
+    # history.json は集計用(中身は最小限)、recent.json は画面用(フル装備)
+    history = load_json(player_dir / "history.json", [])
+    recent = unpack_recent(load_json(player_dir / "recent.json", []))
+    known = {battle_key(b) for b in history}
+    additions = [b for b in battles if battle_key(b) not in known]
+
+    by_time = lambda b: b.get("battleTime", "")
+
+    # 集計用は全部まとめて最小限に
+    merged = [slim_battle(b) for b in additions] + [slim_battle(b) for b in history]
+    merged.sort(key=by_time, reverse=True)
+
+    # 画面用は、デッキが入っているものを集めて上から切る。
+    # 以前フル装備で貯めていた history からも拾えるので、
+    # この仕組みに切り替えた直後でも直近ぶんは埋まる。
+    def has_cards(b):
+        team = b.get("team") or []
+        return bool(team and team[0].get("cards"))
+
+    pool = {}
+    for b in list(recent) + [b for b in history if has_cards(b)] + additions:
+        k = battle_key(b)
+        if k not in pool or (not has_cards(pool[k]) and has_cards(b)):
+            pool[k] = b
+    merged_recent = sorted(pool.values(), key=by_time, reverse=True)[:RECENT_BATTLES]
+
+    now = datetime.now(timezone.utc)
+
+    before = len(merged)
+    merged = prune_battles(merged, now)
+    dropped = before - len(merged)
+
+    # --- パス・オブ・レジェンド (天界) の情報 ---
+    # シーズン中はここにレートとリーグ番号が入る。オフシーズンだと空のことがある。
+    pol = player.get("currentPathOfLegendSeasonResult") or {}
+    best_pol = player.get("bestPathOfLegendSeasonResult") or {}
+    last_pol = player.get("lastPathOfLegendSeasonResult") or {}
+
+    # --- シーズンの切り替わり判定 ---
+    prev = load_json(player_dir / "player.json", {}) or {}
+    current_season = season_key(now)
+    changed = bool(prev.get("season")) and prev.get("season") != current_season
+
+    if changed:
+        # 新シーズン。APIが前シーズンの値を返し続けている間は
+        # マスターI・レートなしとして扱う(実際のゲームもリセットされている)
+        pending = {
+            "leagueNumber": prev.get("rawLeagueNumber"),
+            "rating": prev.get("rawRating"),
+            "battleCount": prev.get("battleCount"),
+        }
+        print(f"    シーズン更新: {prev.get('season')} → {current_season} (レート推移をリセット)")
+    else:
+        pending = prev.get("resetPending")
+
+    stale = looks_stale(pol, player, pending)
+    if not stale:
+        pending = None
+
+    # 表示に使う値。まだ前シーズンの値なら マスターI に見せる
+    show_rating = None if stale else pol.get("trophies")
+    show_league = RESET_LEAGUE if stale else pol.get("leagueNumber")
+
+    # --- トロフィー/レート推移の記録 ---
+    # 10分おきに走るので、中身が前回と同じなら記録しない(無駄に増やさない)
+    # シーズンが変わったら推移は捨てて、新シーズン分だけ貯め直す
+    trophies = [] if changed else load_json(player_dir / "trophies.json", [])
+    # 前シーズンの記録は落とす。シーズンの印が無い古い記録もここで消える
+    # (途中からこの仕組みを入れたので、初回だけまとめて片付く)
+    before_trim = len(trophies)
+    trophies = [t for t in trophies if t.get("season") == current_season]
+    if before_trim and not trophies:
+        print(f"    前シーズンの推移 {before_trim}点を片付けました")
+    snapshot = {
+        "time": now.isoformat(timespec="seconds"),
+        "season": current_season,
+        "trophies": player.get("trophies"),
+        "rating": show_rating,
+        "leagueNumber": show_league,
+        "battleCount": player.get("battleCount"),
+        "wins": player.get("wins"),
+        "losses": player.get("losses"),
+    }
+    if not same_snapshot(trophies[-1] if trophies else None, snapshot):
+        trophies.append(snapshot)
+    trophies = compact_trophies(trophies, now)
+
+    summary = {
+        "updatedAt": now.isoformat(timespec="seconds"),
+        "tag": player.get("tag"),
+        "name": player.get("name"),
+        "label": label or player.get("name"),
+        "groups": groups or [],
+        # 天界(パス・オブ・レジェンド)。表示用の値
+        "rating": show_rating,
+        "leagueNumber": show_league,
+        "polRank": None if stale else pol.get("rank"),
+        # APIが返した生の値と、シーズンの状態
+        "rawRating": pol.get("trophies"),
+        "rawLeagueNumber": pol.get("leagueNumber"),
+        "season": current_season,
+        "resetPending": pending,
+        "bestRating": best_pol.get("trophies"),
+        "bestLeagueNumber": best_pol.get("leagueNumber"),
+        "lastRating": last_pol.get("trophies"),
+        # 通常トロフィー
+        "trophies": player.get("trophies"),
+        "bestTrophies": player.get("bestTrophies"),
+        "arena": (player.get("arena") or {}).get("name"),
+        # 通算
+        "battleCount": player.get("battleCount"),
+        "wins": player.get("wins"),
+        "losses": player.get("losses"),
+        "clan": (player.get("clan") or {}).get("name"),
+        "storedBattles": len(merged),
+        # 期間別集計 (ランキング用)
+        "periods": period_stats(merged, tag),
+        # 過去の20勝チャレンジ(選手ページにだけ出す)
+        "pastChallenges": past_challenges(player.get("badges")),
+        # 達成バッジ(イベントの勝利数など)
+        "achievements": update_achievements(
+            prev.get("achievements"), list(battles) + merged_recent, tag, now,
+            player.get("badges")),
+    }
+
+    # 画面用: 直近だけフル装備(デッキやスターレベルも入る)
+    save_json(player_dir / "recent.json", pack_recent(merged_recent))
+    # 集計用: 全期間だが中身は最小限
+    save_json(player_dir / "history.json", merged)
+    save_json(player_dir / "trophies.json", trophies)
+    save_json(player_dir / "player.json", summary)
+    # プレイヤーのバッジ(大会やチャレンジの実績)。称号の判定に使う
+    save_json(player_dir / "badges.json", [
+        {k: b.get(k) for k in ("name", "level", "maxLevel", "progress", "target")}
+        for b in player.get("badges") or []
+    ])
+
+    rating_text = summary["rating"] if summary["rating"] is not None else "レート無し"
+    trimmed = f" / 古い試合を{dropped}件整理" if dropped else ""
+    print(
+        f"  {summary['label']}: {rating_text} / 新規 {len(additions)} / 累計 {len(merged)} 試合{trimmed}"
+    )
+    return summary
+
+
+def previous_summary(tag: str, label, groups):
+    """前回保存した player.json を返す。今回取れなかった人の代わりに使う。"""
+    prev = load_json(DATA_DIR / tag / "player.json", None)
+    if not isinstance(prev, dict) or not prev.get("tag"):
+        print(f"  {label or tag}: 取得できず、前回の記録もありません", file=sys.stderr)
+        return None
+    # 表示名やグループは players.json の最新に合わせる
+    prev["label"] = label or prev.get("label") or prev.get("name")
+    prev["groups"] = groups or []
+    print(f"  {prev['label']}: 取得できなかったので前回の結果を表示します", file=sys.stderr)
+    return prev
+
+
+def past_challenges(badges):
+    """プレイヤーのバッジから、20勝チャレンジ(Crl20Wins2025 など)を達成した年を拾う。
+    今年の分を出すかどうかは画面側で決める(index.json の challengeYear)。"""
+    years = []
+    for b in badges or []:
+        m = re.fullmatch(r"Crl20Wins(\d{4})", str(b.get("name", "")))
+        if m and (b.get("progress") is None or b.get("progress", 0) >= 20):
+            years.append(int(m.group(1)))
+    return [{"year": y, "label": "20勝達成"} for y in sorted(set(years), reverse=True)]
+
+
+def event_wins(battles, tag: str, event_tag: str) -> int:
+    """そのイベントで到達した勝利数の最大値。
+
+    イベントの対戦ログでは startingTrophies がそれまでの勝利数、
+    trophyChange が今回の増分(勝ちで+1)になっている。
+    """
+    best = 0
+    for b in battles:
+        if b.get("eventTag") != event_tag:
+            continue
+        team = b.get("team") or []
+        me = next((p for p in team if str(p.get("tag", "")).lstrip("#").upper() == tag),
+                  team[0] if team else {})
+        start = me.get("startingTrophies")
+        if not isinstance(start, int):
+            continue
+        change = me.get("trophyChange") if isinstance(me.get("trophyChange"), int) else 0
+        best = max(best, start + max(change, 0))
+    return best
+
+
+def update_achievements(prev_list, battles, tag: str, now, badges=None):
+    """前回までの達成に、今回新しく達成したものを足して返す。"""
+    have = {a.get("id"): a for a in (prev_list or []) if isinstance(a, dict)}
+    badge_names = {str(b.get("name")) for b in badges or []}
+    for a in ACHIEVEMENTS:
+        # 昔の id で保存されていたら引き継ぐ
+        for old in a.get("aliases") or []:
+            if old in have:
+                have[a["id"]] = {**have.pop(old), "id": a["id"], "label": a["label"]}
+        if a["id"] in have and a.get("year"):
+            have[a["id"]]["year"] = a["year"]
+        if a["id"] in have:
+            continue
+        by_event = bool(a.get("eventTag")) and event_wins(battles, tag, a["eventTag"]) >= a.get("wins", 20)
+        by_badge = bool(a.get("badge")) and a["badge"] in badge_names
+        if by_event or by_badge:
+            have[a["id"]] = {"id": a["id"], "label": a["label"], "year": a.get("year"),
+                             "at": now.isoformat(timespec="seconds")}
+            print(f"    🏆 {a['label']} を達成")
+    # 設定の並び順で返す(設定から消したものも、達成済みなら残す)
+    order = {a["id"]: i for i, a in enumerate(ACHIEVEMENTS)}
+    return sorted(have.values(), key=lambda a: order.get(a["id"], len(order)))
+
+
+def read_players():
+    """players.json から追跡対象を読む。[(タグ, 表示名, グループ一覧), ...] を返す。
+
+    グループはランキングを分ける単位(例: チャンネルメンバーの所属)。
+    掛け持ちできるよう、書き方は次のどちらでもよい。
+        "group": "スパ研"
+        "group": ["スパ研", "SMAP"]
+    キー名は group でも groups でも受け付ける。
+    """
+    raw = load_json(PLAYERS_FILE, None)
+    if raw is None:
+        raise SystemExit("players.json が見つからないか、内容が壊れています")
+
+    entries = []
+    for item in raw.get("players", []):
+        tag = str(item.get("tag", "")).strip().upper().lstrip("#")
+        if not tag:
+            continue
+
+        value = item.get("groups", item.get("group"))
+        if isinstance(value, str):
+            value = [value]
+        elif not isinstance(value, list):
+            value = []
+        groups = []
+        for g in value:
+            g = str(g).strip()
+            if g and g not in groups:
+                groups.append(g)
+
+        # 手で付ける特別な称号。文字列か {"label": ..., "replaces": ...} で書ける
+        titles = []
+        for t in item.get("titles") or []:
+            if isinstance(t, str) and t.strip():
+                titles.append({"label": t.strip()})
+            elif isinstance(t, dict) and str(t.get("label", "")).strip():
+                titles.append({k: v for k, v in t.items() if k in ("label", "sub", "replaces", "image", "year")})
+
+        entries.append((tag, item.get("name") or None, groups, titles))
+    return entries
+
+
+def main():
+    token = os.environ.get("CR_API_TOKEN", "").strip()
+    if not token:
+        raise SystemExit("CR_API_TOKEN を設定してください")
+
+    inspect_token(token)
+
+    entries = read_players()
+    if not entries:
+        raise SystemExit("players.json に1人も登録されていません")
+
+    print(f"{len(entries)}人分を取得します")
+
+    summaries = []
+    failed = 0
+    for i, (tag, label, groups, titles) in enumerate(entries):
+        # 1人目だけフィールドの中身を覗く(2v2リーグの調査用。不要になったら消す)
+        try:
+            result = collect_player(tag, label, groups, token, probe=(i == 0))
+        except Exception as e:
+            # 1人のエラーで全員分の集計を止めない
+            print(f"  エラー: {label or tag} の処理中に {type(e).__name__}: {e}", file=sys.stderr)
+            result = None
+        if not result:
+            # 取れなかった人は前回の結果で表示を続ける(ランキングから消さない)
+            result = previous_summary(tag, label, groups)
+            failed += 1
+        if result:
+            result["titles"] = titles
+            summaries.append(result)
+        if i < len(entries) - 1:
+            time.sleep(1)
+
+    # グループの一覧。players.json に書いた順を保つ
+    all_groups = []
+    for _, _, groups, _ in entries:
+        for g in groups:
+            if g not in all_groups:
+                all_groups.append(g)
+
+    # 今の20勝チャレンジの年。設定の一番新しい年か、誰かがバッジを持っている一番新しい年
+    years = [a["year"] for a in ACHIEVEMENTS if a.get("year")]
+    years += [c.get("year") for s in summaries for c in s.get("pastChallenges") or []
+              if isinstance(c.get("year"), int)]
+
+    save_json(
+        INDEX_FILE,
+        {
+            "updatedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "groups": all_groups,
+            "challengeYear": max(years) if years else None,
+            "players": summaries,
+        },
+    )
+
+    if failed == len(entries):
+        raise SystemExit("1人も取得できませんでした。players.json を確認してください")
+
+    note = f"(うち{failed}人は取得できず前回の結果を表示)" if failed else ""
+    print(f"完了: {len(summaries)}/{len(entries)}人 {note}")
+
+
+if __name__ == "__main__":
+    main()

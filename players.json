@@ -1,0 +1,18 @@
+{
+  "players": [
+    { "tag": "#PRRRPLQGR", "name": "がぶにゃん" },
+    { "tag": "#C22R8GLC", "name": "若旦那",
+      "titles": [{ "label": "スパーキー日本最速20勝", "sub": "JAPAN FASTEST", "replaces": "crl20-2026", "year": 2026 }] },
+    { "tag": "#2U9VGU209", "name": "Schwii" },
+    { "tag": "#LJGLG9U2G", "name": "太郎" },
+    { "tag": "#8Q28JQJ9Q", "name": "そよかぜ" },
+    { "tag": "#9020P09LL", "name": "CHE・HONマン" },
+    { "tag": "#9LCC8GY8Y", "name": "moyasi" },
+    { "tag": "#VGY8CJ0PL", "name": "団子三兄弟" },
+    { "tag": "#8RL0LL90Q", "name": "GTR" },
+    { "tag": "#GYJP0G9JR", "name": "SMAP" },
+    { "tag": "#QGUY2LJQ", "name": "しゅびさん" },
+    { "tag": "#LLUY2C8Y9", "name": "月見ダンゴ" },
+    { "tag": "#VLQ8V22LP", "name": "おこなん" }
+  ]
+}

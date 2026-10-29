@@ -1,0 +1,33 @@
+name: R2に今までのデータを入れる
+
+# 引っ越しのときに1回だけ使う。CR2 の data/ を R2 の members/ にそのまま写す。
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/seed.yml"
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: gabcat-fugyu/CR2
+          path: cr2
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install boto3
+      - name: CR2 のデータを R2 へ
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          rm -rf data && cp -r cr2/data data
+          find data -type f | wc -l
+          python r2sync.py push

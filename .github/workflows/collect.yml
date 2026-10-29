@@ -1,0 +1,38 @@
+name: クラロワ戦績を収集
+
+# R2 から前回までのデータを取ってきて、collect.py で更新し、変わった分だけ R2 に戻す。
+# GitHub の schedule は遅れがちなので、cron-job.org からも workflow_dispatch で叩く。
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: collect
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install boto3
+      - name: R2 から前回までのデータを取得
+        run: |
+          python r2sync.py pull
+          # 何も無いのは異常(まだ入れていない or 取得失敗)。ゼロから作り直さないよう止める
+          test -f data/index.json || { echo "R2 にデータがありません"; exit 1; }
+      - name: 戦績を取得
+        env:
+          CR_API_TOKEN: ${{ secrets.CR_API_TOKEN }}
+        run: python collect.py
+      - name: 変わった分を R2 へ
+        run: python r2sync.py push
