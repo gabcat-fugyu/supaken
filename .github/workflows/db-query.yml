@@ -1,0 +1,38 @@
+name: データベースを見る
+
+# D1 に読み取りの SQL を流して、結果をエラー表示ではなくお知らせ欄に出す(管理用)
+on:
+  workflow_dispatch:
+    inputs:
+      sql:
+        description: "SELECT 文"
+        required: true
+        default: "SELECT id, name, created_at, last_login FROM discord_users ORDER BY created_at"
+
+jobs:
+  query:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: 実行
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SQL: ${{ github.event.inputs.sql }}
+        run: |
+          case "$(echo "$SQL" | tr '[:lower:]' '[:upper:]' | sed 's/^ *//')" in
+            SELECT*) ;;
+            *) echo "::error::SELECT 文だけ実行できます"; exit 1;;
+          esac
+          npx --yes wrangler@4 d1 execute supaken --remote --json --command "$SQL" > out.json
+          python3 - <<'PY'
+          import json
+          data = json.load(open("out.json"))
+          rows = data[0].get("results", []) if isinstance(data, list) else []
+          print(f"::notice title=件数::{len(rows)}")
+          for r in rows[:40]:
+              print(f"::notice title=行::{json.dumps(r, ensure_ascii=False)}")
+          PY
