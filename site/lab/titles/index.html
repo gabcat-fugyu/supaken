@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07173a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>称号ラボ | スパ研便利ツール</title>
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/assets/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/base.css">
+<link rel="stylesheet" href="/titles.css">
+<style>
+  .sect-title { margin: 22px 0 8px; font-family: 'Mochiy Pop One', sans-serif; font-size: 14px; color: var(--gold-lite); }
+  .sect-note { font-size: 10.5px; color: var(--ink-dim); margin: -4px 0 8px; line-height: 1.6; }
+
+  /* 設定パネル */
+  .panel {
+    padding: 14px; border-radius: 16px;
+    background: linear-gradient(180deg, rgba(44,94,190,0.92), rgba(13,40,96,0.92));
+    border: 2px solid var(--panel-edge); border-bottom-width: 4px;
+  }
+  .panel label { display: block; font-size: 11px; font-weight: 800; color: var(--ink-dim); margin: 10px 0 5px; }
+  .panel label:first-child { margin-top: 0; }
+  .panel input, .panel select {
+    width: 100%; padding: 10px 11px; font: inherit; font-size: 16px; color: var(--ink);
+    background: rgba(6,16,40,0.65); border: 2px solid rgba(120,170,240,0.4); border-radius: 10px;
+  }
+  .panel input:focus, .panel select:focus { outline: none; border-color: var(--gold); }
+  .row2 { display: grid; grid-template-columns: 1fr 96px; gap: 8px; }
+  .designs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+  .design-btn {
+    display: grid; place-items: center; gap: 6px; padding: 9px 4px 8px; border-radius: 11px; cursor: pointer;
+    background: rgba(6,16,40,0.5); border: 2px solid rgba(120,170,240,0.3); color: var(--ink-dim);
+    font: inherit; font-size: 10.5px; font-weight: 800;
+  }
+  .design-btn.on { border-color: var(--gold); color: var(--gold-lite); background: rgba(255,210,63,0.08); }
+  .check { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12px; }
+  .check input { width: auto; }
+
+  /* 順位表(メン限ページと同じ見た目) */
+  .plate {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    background: linear-gradient(180deg, rgba(35,79,163,0.92), rgba(16,44,102,0.92));
+    border: 2px solid rgba(96,150,235,0.5); border-bottom-width: 4px;
+    border-radius: 14px; padding: 9px 12px 9px 8px; margin-bottom: 8px;
+  }
+  .plate.gold   { border-color: var(--gold); box-shadow: 0 0 22px -6px rgba(255,210,63,0.55); }
+  .plate.silver { border-color: #cdd8ec; }
+  .plate.bronze { border-color: #d08a4a; }
+  .plate.pick { outline: 2px dashed rgba(255,232,154,0.55); outline-offset: 3px; }
+  .medal {
+    width: 30px; height: 30px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center;
+    font-family: 'Mochiy Pop One', sans-serif; font-size: 14px;
+    background: linear-gradient(180deg, #2a5cb8, #16336e); border: 2px solid rgba(120,170,240,0.45); color: var(--ink-dim);
+  }
+  .gold .medal   { background: linear-gradient(180deg, var(--gold-lite), #e0a300); border-color: #8a5c00; color: #4a2f00; }
+  .silver .medal { background: linear-gradient(180deg, #ffffff, #b9c6dc); border-color: #8593ad; color: #33405a; }
+  .bronze .medal { background: linear-gradient(180deg, #f0b183, #b96a2c); border-color: #7d4413; color: #40200a; }
+  .shield { width: 38px; height: 38px; flex-shrink: 0; display: grid; place-items: center; }
+  .shield img { width: 100%; height: 100%; object-fit: contain; }
+  .plate-body { flex: 1; min-width: 0; }
+  .plate-titles { display: flex; align-items: center; gap: 4px; margin: 0 0 3px; min-width: 0; }
+  .plate-titles .ttl { height: 17px; font-size: 9px; }
+  .plate-titles .ttl svg { width: 11px; height: 11px; }
+  .t-more {
+    flex-shrink: 0; font-size: 9px; font-weight: 800; line-height: 1; padding: 3px 5px; border-radius: 5px;
+    color: var(--ink-dim); background: rgba(6,16,40,0.55); border: 1px solid rgba(120,170,240,0.35);
+  }
+  .plate-name { display: block; font-weight: 800; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .plate-sub { display: block; font-size: 10.5px; color: var(--ink-dim); margin-top: 1px; }
+  .plate-value { flex-shrink: 0; font-family: 'Mochiy Pop One', sans-serif; font-size: 20px; color: var(--gold); }
+
+  /* プレイヤーページの上の部分 */
+  .banner {
+    position: relative; text-align: center; padding: 20px 16px 18px;
+    background: linear-gradient(180deg, rgba(44,94,190,0.95), rgba(13,40,96,0.95));
+    border: 3px solid var(--gold-deep); border-radius: 18px;
+  }
+  .banner-name { font-family: 'Mochiy Pop One', sans-serif; font-size: 16px; }
+  .banner-sub { font-size: 11px; color: var(--ink-dim); margin-top: 2px; }
+  .title-row { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .banner-shield { width: 76px; height: 76px; margin: 10px auto 4px; }
+  .banner-shield img { width: 100%; height: 100%; object-fit: contain; }
+  .banner-league { font-family: 'Mochiy Pop One', sans-serif; font-size: 13px; color: var(--gold-lite); }
+
+  /* 全デザイン */
+  .gallery { display: grid; gap: 10px; }
+  .gallery-item {
+    display: grid; justify-items: center; gap: 8px; padding: 12px 8px; border-radius: 14px;
+    background: rgba(6,16,40,0.4); border: 1px solid rgba(120,170,240,0.25);
+  }
+  .gallery-item small { font-size: 10.5px; color: var(--ink-dim); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="masthead">
+    <span class="crest">TITLE LAB</span>
+    <a class="cr-btn" href="/member/">← メン限</a>
+  </div>
+  <p class="sect-note">称号の見た目を試すページです。ここで変えても、本当の順位表には何も付きません。</p>
+
+  <div class="panel">
+    <label for="f-label">称号の文字</label>
+    <input id="f-label" maxlength="24" value="スパーキー日本最速20勝">
+    <div class="row2">
+      <div><label for="f-sub">小見出し(大きい札の上に出る英字など)</label><input id="f-sub" maxlength="24" value="JAPAN FASTEST"></div>
+      <div><label for="f-year">年</label><input id="f-year" inputmode="numeric" maxlength="4" value="2026"></div>
+    </div>
+    <label>デザイン</label>
+    <div class="designs" id="designs"></div>
+    <label for="f-who">付ける人(順位表で見る位置)</label>
+    <select id="f-who"></select>
+    <label class="check"><input type="checkbox" id="f-more"> ほかにも称号を持っている(+1 が付く)</label>
+  </div>
+
+  <h2 class="sect-title">順位表ではこう見える</h2>
+  <div id="board"></div>
+
+  <h2 class="sect-title">プレイヤーページではこう見える</h2>
+  <div id="banner"></div>
+
+  <h2 class="sect-title">全部のデザインで並べると</h2>
+  <div class="gallery" id="gallery"></div>
+</div>
+
+<script src="/titles.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+const LEAGUE_FILES = {
+  1: "icon_League_Badge_Master_1.png", 2: "icon_League_Badge_Master_2.png", 3: "icon_League_Badge_Master_3.png",
+  4: "icon_League_Badge_Champion.png", 5: "icon_League_Badge_Grand_Champion.png",
+  6: "icon_League_Badge_Royal_Champion.png", 7: "icon_League_Badge_Ultimate_Champion.png",
+};
+const LEAGUE_NAMES = { 1: "マスターI", 2: "マスターII", 3: "マスターIII", 4: "神々の挑戦I", 5: "神々の挑戦II", 6: "神々の挑戦III", 7: "天界" };
+const shield = (n, cls) => LEAGUE_FILES[n] ? `<div class="${cls}"><img src="/assets/leagues/${LEAGUE_FILES[n]}" alt=""></div>` : `<div class="${cls}"></div>`;
+
+// ログインしていればメン限の本物の順位表、していなければ見本の人たち
+let people = [
+  { name: "プレイヤーA", league: 7, rating: 2900 }, { name: "プレイヤーB", league: 7, rating: 2700 },
+  { name: "プレイヤーC", league: 7, rating: 2500 }, { name: "プレイヤーD", league: 7, rating: 2300 },
+  { name: "プレイヤーE", league: 6, rating: null }, { name: "プレイヤーF", league: 5, rating: null },
+];
+let design = "zap";
+
+async function loadPeople() {
+  try {
+    const [idx, roster] = await Promise.all([
+      fetch("/api/data/index.json", { cache: "no-store" }).then(r => r.ok ? r.json() : Promise.reject()),
+      fetch("/api/data/roster.json", { cache: "no-store" }).then(r => r.ok ? r.json() : { users: [] }),
+    ]);
+    const nameOf = new Map();
+    for (const u of roster.users || []) for (const a of u.accounts || []) nameOf.set(a.tag.replace("#", ""), u.displayName);
+    people = (idx.players || []).map(p => ({
+      name: nameOf.get(String(p.tag).replace("#", "")) || p.label || p.name,
+      league: p.leagueNumber, rating: p.rating,
+    })).sort((a, b) => ((b.league ?? -1) - (a.league ?? -1)) || ((b.rating ?? -1) - (a.rating ?? -1))).slice(0, 8);
+  } catch { /* 見本のまま */ }
+  $("f-who").innerHTML = people.map((p, i) => `<option value="${i}">${i + 1}位 ${esc(p.name)}</option>`).join("");
+  draw();
+}
+
+function current() {
+  return { label: $("f-label").value || "称号", sub: $("f-sub").value, year: $("f-year").value, design };
+}
+
+function draw() {
+  const t = current();
+  const who = Number($("f-who").value || 0);
+  const more = $("f-more").checked;
+
+  $("designs").innerHTML = Titles.DESIGNS.map(d =>
+    `<button class="design-btn${d.id === design ? " on" : ""}" data-d="${d.id}">${Titles.html({ label: d.name, design: d.id })}${esc(d.name)}</button>`
+  ).join("");
+  $("designs").querySelectorAll("[data-d]").forEach(b => { b.onclick = () => { design = b.dataset.d; draw(); }; });
+
+  $("board").innerHTML = people.map((p, i) => {
+    const cls = i === 0 ? " gold" : i === 1 ? " silver" : i === 2 ? " bronze" : "";
+    const titles = i === who
+      ? `<span class="plate-titles">${Titles.html({ label: t.label, design: t.design })}${more ? `<span class="t-more">+1</span>` : ""}</span>` : "";
+    const val = p.league === 7 && p.rating != null ? p.rating : `<span style="font-size:12px">${esc(LEAGUE_NAMES[p.league] || "")}</span>`;
+    return `<div class="plate${cls}${i === who ? " pick" : ""}">
+      <span class="medal">${i + 1}</span>${shield(p.league, "shield")}
+      <span class="plate-body">${titles}<span class="plate-name">${esc(p.name)}</span>
+        <span class="plate-sub">${p.league === 7 ? "天界" : esc(LEAGUE_NAMES[p.league] || "")}</span></span>
+      <span class="plate-value">${val}</span>
+    </div>`;
+  }).join("");
+
+  const p = people[who] || people[0];
+  $("banner").innerHTML = `<div class="banner">
+    <div class="banner-name">${esc(p.name)}</div>
+    <div class="title-row">${Titles.html(t, { big: true })}</div>
+    ${more ? `<div class="title-row">${Titles.html({ label: "20勝達成", design: "std" })}</div>` : ""}
+    ${shield(p.league, "banner-shield")}
+    <div class="banner-league">${esc(LEAGUE_NAMES[p.league] || "")}</div>
+  </div>`;
+
+  $("gallery").innerHTML = Titles.DESIGNS.map(d => `<div class="gallery-item">
+    <small>${esc(d.name)}</small>
+    ${Titles.html({ ...t, design: d.id })}
+    ${Titles.html({ ...t, design: d.id }, { big: true })}
+  </div>`).join("");
+}
+
+for (const id of ["f-label", "f-sub", "f-year"]) $(id).addEventListener("input", draw);
+$("f-who").addEventListener("change", draw);
+$("f-more").addEventListener("change", draw);
+loadPeople();
+</script>
+</body>
+</html>

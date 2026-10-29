@@ -1,0 +1,127 @@
+/* 称号の見た目。メン限ページと称号ラボで共通に使う。
+ *
+ *   <span class="ttl ttl-zap">…</span>        順位表の小さい札
+ *   <span class="ttl ttl-zap big">…</span>    プレイヤーページの大きい札
+ *
+ * デザインごとに色を変数で持たせ、縁は conic-gradient の角度を回して光らせる。
+ */
+@property --ttl-a { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+
+.ttl {
+  --bg1: #2a1a5e; --bg2: #0b0320;
+  --ring: #ffffff, #8f86ad, #ffffff;
+  --txt: linear-gradient(180deg, #ffffff, #e6e0ff);
+  --ico: #ffffff; --ico-glow: rgba(255,255,255,0.7);
+  --glow: rgba(160,120,255,0.6);
+  --spin: 3.6s;
+
+  position: relative; overflow: hidden; flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 20px; padding: 0 8px 0 5px; border-radius: 7px;
+  font-family: 'Mochiy Pop One', sans-serif; font-size: 10px; line-height: 1; white-space: nowrap;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(180deg, var(--bg1), var(--bg2)) padding-box,
+    conic-gradient(from var(--ttl-a), var(--ring)) border-box;
+  box-shadow: 0 0 10px -1px var(--glow);
+  animation: ttl-spin var(--spin) linear infinite;
+  vertical-align: middle;
+}
+.ttl b {
+  font-weight: normal;
+  background: var(--txt); -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 1px 0 rgba(0,0,0,0.6));
+}
+.ttl svg {
+  width: 13px; height: 13px; flex-shrink: 0; fill: var(--ico);
+  filter: drop-shadow(0 0 3px var(--ico-glow));
+}
+.ttl-text { display: inline-flex; align-items: center; }
+.ttl-sub { display: none; }
+
+@keyframes ttl-spin { to { --ttl-a: 360deg; } }
+
+/* 光が走る(金・氷・標準) */
+.ttl-gold::after, .ttl-ice::after, .ttl-std::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,0.55), transparent);
+  transform: skewX(-20deg); animation: ttl-shine 3.4s ease-in-out infinite; pointer-events: none;
+}
+@keyframes ttl-shine { 0%, 62% { left: -60%; } 100% { left: 130%; } }
+
+/* 電撃がバチッと光る(紫電撃) */
+.ttl-zap svg { animation: ttl-zap 2.2s steps(1) infinite; }
+@keyframes ttl-zap {
+  0%, 70%, 78%, 100% { opacity: 1; }
+  72% { opacity: 0.35; }
+  75% { opacity: 1; filter: drop-shadow(0 0 5px #fff) drop-shadow(0 0 10px var(--ico-glow)); }
+}
+/* 炎がゆらぐ(赤炎) */
+.ttl-flame svg { animation: ttl-flicker 1.4s ease-in-out infinite; transform-origin: 50% 90%; }
+@keyframes ttl-flicker {
+  0%, 100% { transform: scale(1, 1); }
+  30% { transform: scale(0.94, 1.08); }
+  60% { transform: scale(1.05, 0.95); }
+}
+/* 文字の虹が流れる(虹) */
+.ttl-rainbow b { background-size: 200% 100%; animation: ttl-flow 3s linear infinite; }
+@keyframes ttl-flow { to { background-position: 200% 0; } }
+
+/* ---- デザイン ---- */
+.ttl-zap {          /* 紫電撃: 闇色の地に、銀と紫の光が回る縁 */
+  --bg1: #3a1470; --bg2: #0b0320;
+  --ring: #f7f3ff, #8f86ad, #c77dff, #ffffff, #e8c98a, #6f6593, #e2b8ff, #f7f3ff;
+  --txt: linear-gradient(180deg, #ffffff 0%, #eee4ff 40%, #b59ae0 58%, #f6efff 100%);
+  --ico: #e2b8ff; --ico-glow: #b44dff; --glow: rgba(180,77,255,0.85);
+}
+.ttl-gold {         /* 金: 王道。金と白の縁、金の文字 */
+  --bg1: #3d2905; --bg2: #120a00;
+  --ring: #fff6d0, #ffd23f, #b8790a, #ffffff, #ffd23f, #7a4d05, #fff6d0;
+  --txt: linear-gradient(180deg, #fffbe6 0%, #ffe07a 45%, #ffb300 55%, #fff1b8 100%);
+  --ico: #ffd23f; --ico-glow: rgba(255,200,60,0.9); --glow: rgba(255,200,60,0.75);
+}
+.ttl-flame {        /* 赤炎: 赤から黄色の炎の縁 */
+  --bg1: #4a0d05; --bg2: #160200;
+  --ring: #ffef9a, #ff8a1f, #e0241b, #ffd23f, #ff5a1f, #7a0c05, #ffef9a;
+  --txt: linear-gradient(180deg, #fff7d6 0%, #ffd23f 40%, #ff7a1f 62%, #ffe08a 100%);
+  --ico: #ff9a2f; --ico-glow: #ff4d1f; --glow: rgba(255,90,30,0.8);
+  --spin: 2.6s;
+}
+.ttl-ice {          /* 青氷: 白と水色の澄んだ縁 */
+  --bg1: #0a2e5c; --bg2: #031226;
+  --ring: #ffffff, #9be8ff, #3aa0ff, #e6fbff, #6fd3ff, #1b5fb5, #ffffff;
+  --txt: linear-gradient(180deg, #ffffff 0%, #dff7ff 45%, #8fdcff 62%, #f2fcff 100%);
+  --ico: #bff0ff; --ico-glow: #4cc9ff; --glow: rgba(76,201,255,0.75);
+  --spin: 4.4s;
+}
+.ttl-rainbow {      /* 虹: 特別なとき用。縁も文字も虹色 */
+  --bg1: #1d1b33; --bg2: #050508;
+  --ring: #ff5a5a, #ffb84d, #fff35a, #5aff8a, #5ad8ff, #8a6bff, #ff5ad8, #ff5a5a;
+  --txt: linear-gradient(90deg, #ff9a9a, #ffd88a, #fff7a0, #9affb8, #9ae6ff, #c3a6ff, #ff9ae6, #ff9a9a);
+  --ico: #ffffff; --ico-glow: rgba(255,255,255,0.9); --glow: rgba(255,255,255,0.55);
+  --spin: 2.2s;
+}
+.ttl-std {          /* 標準: 自動で付く称号(20勝達成など)。縁は回らない */
+  background: linear-gradient(135deg, #6a1bd1 0%, #c81f6e 55%, #ff8a1f 100%);
+  border: 1.5px solid #ffd23f; animation: none;
+  --txt: linear-gradient(180deg, #fff8dc, #fff4c8);
+  --ico: #ffe89a; --ico-glow: rgba(255,220,120,0.9); --glow: rgba(255,170,60,0.75);
+}
+
+/* ---- 大きい札(プレイヤーページ) ---- */
+.ttl.big {
+  height: auto; padding: 7px 16px 8px 12px; border-radius: 12px; gap: 9px;
+  font-size: 15px; border-width: 2.5px;
+}
+.ttl.big svg { width: 24px; height: 24px; }
+.ttl.big .ttl-text { flex-direction: column; align-items: flex-start; gap: 3px; }
+.ttl.big .ttl-sub {
+  display: block; font-size: 8.5px; letter-spacing: 0.22em; color: var(--ico);
+  text-shadow: 0 0 6px var(--ico-glow);
+}
+.ttl-std.big { border-width: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ttl, .ttl svg, .ttl b { animation: none !important; }
+  .ttl::after { display: none; }
+}

@@ -1711,6 +1711,7 @@ function drawProfile() {
     </div>
     ${adminData ? `<div class="pf">
       <h3>管理(全員の登録)</h3>
+      <p class="note"><a href="/lab/titles/" style="color:var(--gold-lite)">称号ラボ</a> で称号の見た目を試せます。</p>
       <p class="note">間違えて登録されたアカウントは、ここから外せます。外したアカウントは、本来の人があらためて登録できます。</p>
       ${(adminData.accounts || []).map(a => `<div class="acc">
         <span class="acc-role${a.role === "main" ? " main" : ""}">${a.role === "main" ? "メイン" : "サブ"}</span>
