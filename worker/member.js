@@ -10,18 +10,18 @@
 //   /api/discord/login, /api/discord/callback   Discord でログイン(メン限ロールを確認)
 //   /api/me, /api/logout                         ログイン状態
 //   /api/profile                                 表示名と、結びつけたゲームアカウント
-//   /api/accounts/start, /finish                 ゲームアカウントを追加(デッキに指定のカードを入れて本人確認)
-//   /api/accounts/remove, /main                  外す・メインにする
+//   /api/accounts/add, /remove, /main            ゲームアカウントを追加・外す・メインにする
+//   /api/admin/accounts, /api/admin/remove       管理人: 全員の登録を見る・外す
 //   /api/data/...                                戦績データ(R2 の members/...)
 //
 // 使うもの(wrangler.toml / secret):
-//   DB    … D1(sessions / discord_users / profiles / game_accounts / link_challenges)
+//   DB    … D1(sessions / discord_users / profiles / game_accounts)
 //   DATA  … R2(戦績データ。members/roster.json にアカウントの結びつきを書き出す)
 //   DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_GUILD_ID, DISCORD_MEMBER_ROLE_ID, DISCORD_EXTRA_IDS
-//   CR_API_TOKEN … クラロワAPI(本人確認でプロフィールを見る)
+//   ADMIN_DISCORD_IDS … 管理人の Discord ユーザーID(カンマ区切り)
+//   CR_API_TOKEN … クラロワAPI(登録するタグが本当にあるか確かめる)
 
 const SESSION_DAYS = 30;          // メンバーシップをやめた人が残り続けないよう、ひと月で入り直し
-const CHALLENGE_MINUTES = 30;     // 本人確認の有効時間
 const MAX_SUBS = 2;               // サブアカウントの上限(メインは1つ)
 const DISCORD = "https://discord.com/api";
 const CR_API = "https://proxy.royaleapi.dev/v1";
@@ -78,6 +78,9 @@ async function startSession(env, discordId) {
   return cookie("sid", token, maxAge);
 }
 
+const isAdmin = (env, id) =>
+  String(env.ADMIN_DISCORD_IDS || "").split(",").map((s) => s.trim()).filter(Boolean).includes(id);
+
 async function me(env, id) {
   const row = await env.DB.prepare(
     `SELECT u.id, u.name, u.avatar, p.display_name FROM discord_users u
@@ -89,6 +92,7 @@ async function me(env, id) {
     name: row.display_name || row.name,
     discordName: row.name,
     avatar: row.avatar ? `https://cdn.discordapp.com/avatars/${row.id}/${row.avatar}.png?size=64` : null,
+    admin: isAdmin(env, row.id),
   };
 }
 
@@ -234,7 +238,9 @@ async function checkAdd(env, id, tag, role) {
   return null;
 }
 
-async function accountStart(request, env, id) {
+// 登録は確認なし(入れるのはメン限ロールの人だけなので、身内の信用で十分)。
+// 1つのアカウントは1人にしか登録できない。間違いは管理人が外せる
+async function accountAdd(request, env, id) {
   const body = await readBody(request);
   const tag = cleanTag(body.tag);
   let role = body.role === "main" ? "main" : "sub";
@@ -246,60 +252,53 @@ async function accountStart(request, env, id) {
 
   const player = await crPlayer(env, tag);
   if (!player) return fail(404, "プレイヤーが見つかりませんでした。タグを確かめてください");
-  // 本人確認: 今のデッキに入っていない手持ちのカードを1枚選び、デッキに入れてもらう。
-  // (お気に入りカードはゲーム側が自動で決めるので変えられない)
-  // チャンピオンは1枚しか入らず入れ替えが面倒なので外す
-  const inDeck = new Set((player.currentDeck || []).map((c) => c.id));
-  const pool = (player.cards || []).filter((c) =>
-    !inDeck.has(c.id) && c.iconUrls?.medium && String(c.rarity || "").toLowerCase() !== "champion");
-  if (!pool.length) return fail(500, "カードの情報が取れませんでした");
-  const card = pool[Math.floor(Math.random() * pool.length)];
 
-  await env.DB.prepare(
-    `INSERT OR REPLACE INTO link_challenges (discord_id, tag, role, card_id, card_name, card_icon, expires_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(id, tag, role, card.id, card.name, card.iconUrls.medium, now() + CHALLENGE_MINUTES * 60).run();
-
-  return json({ tag, role, playerName: player.name, card: { name: card.name, icon: card.iconUrls.medium } });
-}
-
-async function accountFinish(request, env, id) {
-  const ch = await env.DB.prepare("SELECT * FROM link_challenges WHERE discord_id = ?").bind(id).first();
-  if (!ch || ch.expires_at < now()) return fail(400, "時間切れです。もう一度はじめからやってください");
-  const problem = await checkAdd(env, id, ch.tag, ch.role);
-  if (problem) return fail(400, problem);
-
-  const player = await crPlayer(env, ch.tag);
-  if (!player) return fail(502, "クラロワのプロフィールが取れませんでした。少し待ってもう一度押してください");
-  if (!(player.currentDeck || []).some((c) => c.id === ch.card_id)) {
-    return fail(400, `まだデッキに ${ch.card_name} が入っていません。入れたばかりなら、1〜2分待ってからもう一度押してください`);
-  }
-
-  const ts = new Date().toISOString();
   const stmts = [];
-  if (ch.role === "main") {
+  if (role === "main") {
     stmts.push(env.DB.prepare("UPDATE game_accounts SET role = 'sub' WHERE discord_id = ? AND role = 'main'").bind(id));
   }
   stmts.push(env.DB.prepare("INSERT INTO game_accounts (tag, discord_id, role, name, added_at) VALUES (?, ?, ?, ?, ?)")
-    .bind(ch.tag, id, ch.role, player.name, ts));
-  stmts.push(env.DB.prepare("DELETE FROM link_challenges WHERE discord_id = ?").bind(id));
+    .bind(tag, id, role, player.name, new Date().toISOString()));
   await env.DB.batch(stmts);
   await writeRoster(env);
   return json(await profile(env, id));
 }
 
-async function accountRemove(request, env, id) {
-  const tag = cleanTag((await readBody(request)).tag);
-  const row = await env.DB.prepare("SELECT role FROM game_accounts WHERE tag = ? AND discord_id = ?").bind(tag, id).first();
-  if (!row) return fail(404, "そのアカウントは登録されていません");
+// アカウントを外す。メインを外したら、その人の一番古いサブをメインにする
+async function removeAccount(env, tag, owner) {
+  const row = await env.DB.prepare("SELECT role, discord_id FROM game_accounts WHERE tag = ?").bind(tag).first();
+  if (!row || (owner && row.discord_id !== owner)) return false;
   await env.DB.prepare("DELETE FROM game_accounts WHERE tag = ?").bind(tag).run();
-  // メインを外したら、一番古いサブをメインにする
   if (row.role === "main") {
-    const next = (await myAccounts(env, id))[0];
+    const next = (await myAccounts(env, row.discord_id))[0];
     if (next) await env.DB.prepare("UPDATE game_accounts SET role = 'main' WHERE tag = ?").bind(next.tag).run();
   }
   await writeRoster(env);
+  return true;
+}
+
+async function accountRemove(request, env, id) {
+  const tag = cleanTag((await readBody(request)).tag);
+  if (!(await removeAccount(env, tag, id))) return fail(404, "そのアカウントは登録されていません");
   return json(await profile(env, id));
+}
+
+// ---- 管理人 ----
+async function adminAccounts(env) {
+  const { results } = await env.DB.prepare(
+    `SELECT g.tag, g.role, g.name, g.discord_id, g.added_at, p.display_name, u.name AS discord_name
+     FROM game_accounts g
+     LEFT JOIN profiles p ON p.discord_id = g.discord_id
+     LEFT JOIN discord_users u ON u.id = g.discord_id
+     ORDER BY COALESCE(p.display_name, u.name), g.role = 'main' DESC, g.added_at`
+  ).all();
+  return json({ accounts: results || [] });
+}
+
+async function adminRemove(request, env) {
+  const tag = cleanTag((await readBody(request)).tag);
+  if (!(await removeAccount(env, tag, null))) return fail(404, "そのアカウントは登録されていません");
+  return adminAccounts(env);
 }
 
 async function accountMain(request, env, id) {
@@ -354,10 +353,14 @@ export default {
           return user ? json(user) : fail(401, "ログインしてください");
         }
         if (p === "/api/profile") return post ? await setProfile(request, env, id) : json(await profile(env, id));
-        if (p === "/api/accounts/start" && post) return await accountStart(request, env, id);
-        if (p === "/api/accounts/finish" && post) return await accountFinish(request, env, id);
+        if (p === "/api/accounts/add" && post) return await accountAdd(request, env, id);
         if (p === "/api/accounts/remove" && post) return await accountRemove(request, env, id);
         if (p === "/api/accounts/main" && post) return await accountMain(request, env, id);
+        if (p.startsWith("/api/admin/")) {
+          if (!isAdmin(env, id)) return fail(403, "管理人だけが使えます");
+          if (p === "/api/admin/accounts") return await adminAccounts(env);
+          if (p === "/api/admin/remove" && post) return await adminRemove(request, env);
+        }
         return fail(404, "not found");
       }
     } catch (e) {

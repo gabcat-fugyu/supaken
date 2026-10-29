@@ -23,8 +23,8 @@ database_name = "supaken"
 database_id = "__D1_ID__"
 
 [vars]
-# 管理人のタグ(カンマ区切り)。称号の付与などができる
-ADMIN_TAGS = ""
+# 管理人の Discord ユーザーID(カンマ区切り)。全員のアカウント登録を外せる
+ADMIN_DISCORD_IDS = "757372889136889906"
 # Discord でログインするときの判定。このサーバーでこのロールを持っている人がメン限ページに入れる
 DISCORD_GUILD_ID = "1418622264542236697"
 DISCORD_MEMBER_ROLE_ID = "1525382489558745209"

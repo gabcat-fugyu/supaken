@@ -1626,22 +1626,28 @@ function bindAccSwitch() {
 
 // ---- プロフィール ----
 // 表示名と、ゲームアカウント(メイン1つ+サブ2つまで)の登録。
-// 追加するときは、そのアカウントの今のデッキに指定のカードを入れてもらって本人確認する。
-let profileData = null, linkState = null, profileMsg = { err: "", ok: "" };
+// 追加は確認なし。1つのアカウントは1人にしか登録できず、間違いは管理人が外せる。
+let profileData = null, adminData = null, profileMsg = { err: "", ok: "" };
 
 async function openProfile() {
-  view = "profile"; linkState = null; profileMsg = { err: "", ok: "" };
+  view = "profile"; profileMsg = { err: "", ok: "" }; adminData = null;
   draw();
-  try { profileData = await api("/api/profile"); }
-  catch (e) { profileMsg.err = e.message; }
+  try {
+    profileData = await api("/api/profile");
+    if (profileData.me?.admin) adminData = await api("/api/admin/accounts");
+  } catch (e) { profileMsg.err = e.message; }
   draw();
 }
 
-// プロフィールを変えたら、順位表のまとまりも読み直す
+// プロフィールを変えたら、自分の登録・管理の一覧・順位表のまとまりを全部読み直す
 async function afterProfileChange(data, okMsg) {
-  profileData = data; linkState = null; profileMsg = { err: "", ok: okMsg || "" };
-  if (data.me) currentUser = data.me;
-  try { roster = await loadData("roster.json"); } catch {}
+  try {
+    profileData = data.me ? data : await api("/api/profile");
+    if (profileData.me) currentUser = profileData.me;
+    adminData = profileData.me?.admin ? (data.me ? await api("/api/admin/accounts") : data) : null;
+    roster = await loadData("roster.json");
+  } catch {}
+  profileMsg = { err: "", ok: okMsg || "" };
   draw();
 }
 
@@ -1671,25 +1677,14 @@ function drawProfile() {
   }).join("") || `<p class="note">まだ登録していません。</p>`;
 
   let addBox = "";
-  if (linkState) {
-    addBox = `<div class="card-ask">
-        <img src="${esc(linkState.card.icon)}" alt="${esc(linkState.card.name)}">
-        <p><b>${esc(linkState.playerName)}</b> のクラロワで、<b>今使っているデッキ</b>に
-        このカード(<b>${esc(linkState.card.name)}</b>)を入れてください。<br>
-        <small>場所はどこでもOK。登録できたら元のデッキに戻して大丈夫です</small></p>
-      </div>
-      <div class="pf-row" style="margin-top:10px">
-        <button class="cr-btn go gold" id="pf-finish" style="flex:1">変えたので登録する</button>
-        <button class="cr-btn go" id="pf-cancel">やめる</button>
-      </div>`;
-  } else if (!full) {
+  if (!full) {
     addBox = `<div class="pf-row">
         <input id="pf-tag" placeholder="#タグ" autocapitalize="characters">
         ${hasMain ? `<select id="pf-role" style="width:auto">
           <option value="sub"${subs >= 2 ? " disabled" : ""}>サブ</option>
           <option value="main">メイン</option>
         </select>` : ""}
-        <button class="cr-btn go gold" id="pf-start">追加</button>
+        <button class="cr-btn go gold" id="pf-add">追加</button>
       </div>
       <p class="note" style="margin:8px 0 0">${hasMain
         ? "メインで追加すると、今のメインはサブになります。" : "最初に登録したアカウントがメインになります。"}</p>`;
@@ -1714,6 +1709,15 @@ function drawProfile() {
       ${profileMsg.err ? `<p class="err">${esc(profileMsg.err)}</p>` : ""}
       ${profileMsg.ok ? `<p class="ok">${esc(profileMsg.ok)}</p>` : ""}
     </div>
+    ${adminData ? `<div class="pf">
+      <h3>管理(全員の登録)</h3>
+      <p class="note">間違えて登録されたアカウントは、ここから外せます。外したアカウントは、本来の人があらためて登録できます。</p>
+      ${(adminData.accounts || []).map(a => `<div class="acc">
+        <span class="acc-role${a.role === "main" ? " main" : ""}">${a.role === "main" ? "メイン" : "サブ"}</span>
+        <span class="acc-body"><b>${esc(a.name || a.tag)}</b><small>#${esc(a.tag)} · ${esc(a.display_name || a.discord_name || "?")} が登録</small></span>
+        <span class="acc-btns"><button class="cr-btn" data-admin-remove="${esc(a.tag)}">外す</button></span>
+      </div>`).join("") || `<p class="note">まだ誰も登録していません。</p>`}
+    </div>` : ""}
     <div class="pf pf-me">
       ${who?.avatar ? `<img src="${esc(who.avatar)}" alt="">` : ""}
       <span>Discord: ${esc(who?.discordName || "")} でログイン中</span>
@@ -1728,18 +1732,17 @@ function drawProfile() {
   const $ = (id) => document.getElementById(id);
   $("pf-save").onclick = () => run(() => api("/api/profile", { displayName: $("pf-name").value }), "表示名を保存しました");
   $("pf-logout").onclick = () => logout();
-  if ($("pf-start")) $("pf-start").onclick = async () => {
-    profileMsg = { err: "", ok: "" };
-    try {
-      linkState = await api("/api/accounts/start", { tag: $("pf-tag").value, role: $("pf-role")?.value || "main" });
-    } catch (e) { profileMsg.err = e.message; }
-    draw();
-  };
-  if ($("pf-finish")) $("pf-finish").onclick = () => run(() => api("/api/accounts/finish", {}),
-    "登録しました。戦績は最大10分ほどで出てきます");
-  if ($("pf-cancel")) $("pf-cancel").onclick = () => { linkState = null; profileMsg = { err: "", ok: "" }; draw(); };
+  if ($("pf-add")) $("pf-add").onclick = () => run(
+    () => api("/api/accounts/add", { tag: $("pf-tag").value, role: $("pf-role")?.value || "main" }),
+    "登録しました。はじめてのアカウントは、戦績が出るまで最大10分ほどかかります");
   $main.querySelectorAll("[data-main]").forEach(b => {
     b.onclick = () => run(() => api("/api/accounts/main", { tag: b.dataset.main }), "メインを変更しました");
+  });
+  $main.querySelectorAll("[data-admin-remove]").forEach(b => {
+    b.onclick = () => {
+      if (!confirm(`#${b.dataset.adminRemove} の登録を外しますか？`)) return;
+      run(() => api("/api/admin/remove", { tag: b.dataset.adminRemove }), "外しました");
+    };
   });
   $main.querySelectorAll("[data-remove]").forEach(b => {
     b.onclick = () => {
