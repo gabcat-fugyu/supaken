@@ -10,7 +10,7 @@
 //   /api/discord/login, /api/discord/callback   Discord でログイン(メン限ロールを確認)
 //   /api/me, /api/logout                         ログイン状態
 //   /api/profile                                 表示名と、結びつけたゲームアカウント
-//   /api/accounts/start, /finish                 ゲームアカウントを追加(お気に入りカードで本人確認)
+//   /api/accounts/start, /finish                 ゲームアカウントを追加(デッキに指定のカードを入れて本人確認)
 //   /api/accounts/remove, /main                  外す・メインにする
 //   /api/data/...                                戦績データ(R2 の members/...)
 //
@@ -246,8 +246,12 @@ async function accountStart(request, env, id) {
 
   const player = await crPlayer(env, tag);
   if (!player) return fail(404, "プレイヤーが見つかりませんでした。タグを確かめてください");
-  const favId = player.currentFavouriteCard?.id;
-  const pool = (player.cards || []).filter((c) => c.id !== favId && c.iconUrls?.medium);
+  // 本人確認: 今のデッキに入っていない手持ちのカードを1枚選び、デッキに入れてもらう。
+  // (お気に入りカードはゲーム側が自動で決めるので変えられない)
+  // チャンピオンは1枚しか入らず入れ替えが面倒なので外す
+  const inDeck = new Set((player.currentDeck || []).map((c) => c.id));
+  const pool = (player.cards || []).filter((c) =>
+    !inDeck.has(c.id) && c.iconUrls?.medium && String(c.rarity || "").toLowerCase() !== "champion");
   if (!pool.length) return fail(500, "カードの情報が取れませんでした");
   const card = pool[Math.floor(Math.random() * pool.length)];
 
@@ -267,8 +271,8 @@ async function accountFinish(request, env, id) {
 
   const player = await crPlayer(env, ch.tag);
   if (!player) return fail(502, "クラロワのプロフィールが取れませんでした。少し待ってもう一度押してください");
-  if (player.currentFavouriteCard?.id !== ch.card_id) {
-    return fail(400, "まだお気に入りカードが変わっていません。変えたばかりなら、1〜2分待ってからもう一度押してください");
+  if (!(player.currentDeck || []).some((c) => c.id === ch.card_id)) {
+    return fail(400, `まだデッキに ${ch.card_name} が入っていません。入れたばかりなら、1〜2分待ってからもう一度押してください`);
   }
 
   const ts = new Date().toISOString();

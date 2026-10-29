@@ -1626,7 +1626,7 @@ function bindAccSwitch() {
 
 // ---- プロフィール ----
 // 表示名と、ゲームアカウント(メイン1つ+サブ2つまで)の登録。
-// 追加するときは、そのアカウントのお気に入りカードを指定のカードにしてもらって本人確認する。
+// 追加するときは、そのアカウントの今のデッキに指定のカードを入れてもらって本人確認する。
 let profileData = null, linkState = null, profileMsg = { err: "", ok: "" };
 
 async function openProfile() {
@@ -1674,8 +1674,9 @@ function drawProfile() {
   if (linkState) {
     addBox = `<div class="card-ask">
         <img src="${esc(linkState.card.icon)}" alt="${esc(linkState.card.name)}">
-        <p><b>${esc(linkState.playerName)}</b> のクラロワで、プロフィールの<b>お気に入りカード</b>を
-        このカード(<b>${esc(linkState.card.name)}</b>)にしてください。</p>
+        <p><b>${esc(linkState.playerName)}</b> のクラロワで、<b>今使っているデッキ</b>に
+        このカード(<b>${esc(linkState.card.name)}</b>)を入れてください。<br>
+        <small>場所はどこでもOK。登録できたら元のデッキに戻して大丈夫です</small></p>
       </div>
       <div class="pf-row" style="margin-top:10px">
         <button class="cr-btn go gold" id="pf-finish" style="flex:1">変えたので登録する</button>
