@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07173a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="スパ研">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/assets/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/base.css">
+<title>天界デッキランキング | スパ研便利ツール</title>
+<style>
+  .rail { display: flex; gap: 7px; overflow-x: auto; margin-bottom: 10px; padding: 2px 0 5px; }
+  .rail::-webkit-scrollbar { display: none; }
+  .rail .cr-btn { flex: 0 0 auto; font-size: 12px; font-weight: 800; padding: 7px 14px; }
+  .rail .cr-btn.on { color: #3d2600; background: linear-gradient(180deg, var(--gold-lite), var(--gold)); border-color: var(--gold-deep); }
+  .rail.sub .cr-btn { font-size: 11px; padding: 5px 11px; border-bottom-width: 3px; }
+  .summary { font-size: 11px; color: var(--ink-dim); line-height: 1.6; margin: 2px 2px 12px; }
+  .summary b { color: var(--gold-lite); }
+
+  .deck {
+    margin-bottom: 12px; padding: 12px 12px 10px; border-radius: 16px;
+    background: linear-gradient(180deg, rgba(35,79,163,0.92), rgba(16,44,102,0.92));
+    border: 2px solid rgba(96,150,235,0.5); border-bottom-width: 4px;
+  }
+  .deck.top1 { border-color: var(--gold); }
+  .deck-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .rank {
+    width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center;
+    font-family: 'Mochiy Pop One', sans-serif; font-size: 14px;
+    background: rgba(6,16,40,0.6); border: 2px solid rgba(120,170,240,0.4);
+  }
+  .rank.g1 { color: #3d2600; background: linear-gradient(180deg, var(--gold-lite), var(--gold)); border-color: var(--gold-deep); }
+  .rank.g2 { color: #1b2533; background: linear-gradient(180deg, #ffffff, #b9c6d8); border-color: #8496ad; }
+  .rank.g3 { color: #2e1503; background: linear-gradient(180deg, #ffc58f, #c97a3b); border-color: #8a4a1b; }
+  .stats { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  .stat { text-align: center; }
+  .stat b { display: block; font-family: 'Mochiy Pop One', sans-serif; font-weight: 400; font-size: 16px; color: var(--gold); }
+  .stat b u { text-decoration: none; font-size: 10px; }
+  .stat small { display: block; font-size: 9.5px; color: var(--ink-dim); margin-top: 1px; }
+  .stat.win b { color: #8fd6ff; }
+
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+  .slot { position: relative; aspect-ratio: 5 / 6; border-radius: 8px; background: rgba(6,16,40,0.55); overflow: hidden; }
+  .slot img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .slot .tag {
+    position: absolute; left: 3px; top: 3px; font-size: 8px; font-weight: 800; line-height: 1;
+    padding: 2px 4px; border-radius: 4px; color: #fff; background: rgba(0,0,0,0.6);
+  }
+  .slot.evo { box-shadow: inset 0 0 0 2px #c77dff; }
+  .slot.evo .tag { background: #8a2be2; }
+  .slot.hero { box-shadow: inset 0 0 0 2px var(--gold); }
+  .slot.hero .tag { background: var(--gold-deep); }
+  .deck-foot { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 11px; color: var(--ink-dim); }
+  .tower { width: 26px; height: 26px; object-fit: contain; }
+  .avg { display: inline-flex; align-items: center; gap: 3px; }
+  .avg svg { width: 9px; height: 11px; fill: var(--elixir); }
+  .copy {
+    margin-left: auto; display: inline-flex; align-items: center; gap: 4px; text-decoration: none;
+    font-size: 11px; font-weight: 800; color: #3d2600; padding: 5px 10px; border-radius: 8px;
+    background: linear-gradient(180deg, var(--gold-lite), var(--gold)); border: 2px solid var(--gold-deep); border-bottom-width: 3px;
+  }
+  .copy svg { width: 10px; height: 10px; fill: currentColor; }
+  .notice { text-align: center; padding: 46px 18px; color: var(--ink-dim); font-size: 13px; line-height: 1.9; }
+  .more { display: block; width: 100%; margin: 4px 0 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="masthead">
+    <span class="crest">🃏 DECK RANKING</span>
+    <a class="cr-btn" href="/">← トップ</a>
+  </div>
+  <div id="main"><div class="notice">読み込み中…</div></div>
+  <p class="fine">This material is unofficial and is not endorsed by Supercell.<br>For more information see Supercell's Fan Content Policy: www.supercell.com/fan-content-policy.</p>
+</div>
+<button id="refresh" class="refresh" aria-label="更新">⟳</button>
+<script>
+// 天界デッキランキング。集計は Sparkylab リポジトリ(スパーキーランキングと同じ集計のついで)。
+// 上位の人の対戦ログから、天界(リーグ7)の試合で使ったデッキを数えている。
+const REPO = "gabcat-fugyu/Sparkylab", BRANCH = "main";
+const $main = document.getElementById("main");
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const DROP = `<svg viewBox="0 0 10 13" aria-hidden="true"><path d="M5 0C5 0 0 5.6 0 8.6A5 5 0 0 0 10 8.6C10 5.6 5 0 5 0z"/></svg>`;
+const COPY_ICON = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1h8a2 2 0 0 1 2 2v8h-2V3H5zM1 5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2z"/></svg>`;
+const SORTS = [
+  { id: "use", label: "使用率順" },
+  { id: "win", label: "勝率順(20試合以上)" },
+];
+const PAGE = 20;
+
+let data = null, failed = false, boardKey = "world1000", sortId = "use", shown = PAGE;
+
+async function loadJson(path) {
+  // raw配信はキャッシュが効くので、まずキャッシュを挟まない GitHub API 経由で読む
+  try {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/contents/data/${path}?ref=${BRANCH}&t=${Date.now()}`,
+      { cache: "no-store", headers: { Accept: "application/vnd.github.raw" } });
+    if (res.ok) return await res.json();
+  } catch {}
+  const res = await fetch(`https://raw.githubusercontent.com/${REPO}/${BRANCH}/data/${path}?t=${Date.now()}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(String(res.status));
+  return await res.json();
+}
+
+function ago(iso) {
+  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (!(m >= 0)) return "";
+  if (m < 1) return "たった今";
+  if (m < 60) return m + "分前";
+  const h = Math.floor(m / 60);
+  return h < 24 ? h + "時間前" : Math.floor(h / 24) + "日前";
+}
+
+const card = (id) => data.cards?.[String(id)] || {};
+const winRate = (d) => (d.wins + d.losses) ? d.wins / (d.wins + d.losses) * 100 : null;
+
+// デッキ共有リンク(開くとゲームが起動してデッキがコピーされる)
+function copyUrl(d) {
+  const ids = d.cards.map(([id]) => id);
+  if (ids.length !== 8) return null;
+  return `https://link.clashroyale.com/en/?clashroyale://copyDeck?deck=${ids.join(";")}&l=Royals${d.tower ? `&tt=${d.tower}` : ""}`;
+}
+
+function slot([id, ev], i) {
+  const c = card(id);
+  const kind = i < 3 && ev === 1 ? "evo" : i < 3 && ev === 2 ? "hero" : "";
+  const url = (kind === "evo" && c.i?.evolutionMedium) || (kind === "hero" && c.i?.heroMedium) || c.i?.medium || "";
+  return `<div class="slot ${kind}">${url ? `<img src="${esc(url)}" alt="${esc(c.n || "")}" loading="lazy">` : ""}${
+    kind ? `<span class="tag">${kind === "evo" ? "進化" : "ヒーロー"}</span>` : ""}</div>`;
+}
+
+function render() {
+  if (failed) { $main.innerHTML = `<div class="notice">まだ集計されていません。<br>しばらくしてから開き直してください。</div>`; return; }
+  if (!data) { $main.innerHTML = `<div class="notice">読み込み中…</div>`; return; }
+  const boards = data.boards || [];
+  const b = boards.find(x => x.key === boardKey) || boards[0];
+  if (!b) { $main.innerHTML = `<div class="notice">集計結果がありません。</div>`; return; }
+
+  let list = [...(b.decks || [])];
+  if (sortId === "win") {
+    list = list.filter(d => d.wins + d.losses >= 20).sort((x, y) => winRate(y) - winRate(x));
+  }
+
+  const rows = list.slice(0, shown).map((d, i) => {
+    const use = b.battles ? d.battles / b.battles * 100 : 0;
+    const wr = winRate(d);
+    const costs = d.cards.map(([id]) => card(id).e).filter(v => typeof v === "number");
+    const avg = costs.length ? (costs.reduce((a, c) => a + c, 0) / costs.length).toFixed(1) : null;
+    const tower = d.tower ? card(d.tower) : null;
+    const copy = copyUrl(d);
+    return `<div class="deck${i === 0 ? " top1" : ""}">
+      <div class="deck-head">
+        <span class="rank${i < 3 ? " g" + (i + 1) : ""}">${i + 1}</span>
+        <span class="stats">
+          <span class="stat"><b>${use.toFixed(1)}<u>%</u></b><small>使用率(${d.battles}試合)</small></span>
+          <span class="stat"><b>${d.players}<u>人</u></b><small>使っている人</small></span>
+          <span class="stat win"><b>${wr == null ? "—" : wr.toFixed(1) + "<u>%</u>"}</b><small>勝率</small></span>
+        </span>
+      </div>
+      <div class="grid">${d.cards.map(slot).join("")}</div>
+      <div class="deck-foot">
+        ${tower?.i?.medium ? `<img class="tower" src="${esc(tower.i.medium)}" alt="${esc(tower.n || "")}" title="${esc(tower.n || "")}">` : ""}
+        ${avg ? `<span class="avg">${DROP} 平均 ${avg}</span>` : ""}
+        ${copy ? `<a class="copy" href="${esc(copy)}" target="_blank" rel="noopener">${COPY_ICON}コピー</a>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+
+  $main.innerHTML = `
+    <div class="rail">${boards.map(x =>
+      `<button class="cr-btn${x.key === b.key ? " on" : ""}" data-board="${esc(x.key)}">${esc(x.label)}</button>`).join("")}</div>
+    <div class="rail sub">${SORTS.map(s =>
+      `<button class="cr-btn${s.id === sortId ? " on" : ""}" data-sort="${s.id}">${esc(s.label)}</button>`).join("")}</div>
+    <p class="summary">${esc(b.label)}の<b>${b.players}人</b>が、直近${esc(data.days || 7)}日の天界で使ったデッキ(<b>${b.battles}試合</b>)を数えています。
+      進化・ヒーローの付け方が違えば別のデッキとして数えます。${b.stale ? "<br>※今回は集計できなかったので、前回の結果です。" : ""}
+      ${data.updatedAt ? `<br>更新 ${esc(ago(data.updatedAt))}` : ""}</p>
+    ${rows || `<div class="notice">まだデータがありません。</div>`}
+    ${shown < list.length ? `<button class="cr-btn more" id="more">さらに${Math.min(PAGE, list.length - shown)}個</button>` : ""}`;
+
+  $main.querySelectorAll("[data-board]").forEach(el => { el.onclick = () => { boardKey = el.dataset.board; shown = PAGE; render(); }; });
+  $main.querySelectorAll("[data-sort]").forEach(el => { el.onclick = () => { sortId = el.dataset.sort; shown = PAGE; render(); }; });
+  const more = document.getElementById("more");
+  if (more) more.onclick = () => { shown += PAGE; render(); };
+}
+
+async function load() {
+  try { data = await loadJson("decks.json"); failed = false; }
+  catch { if (!data) failed = true; }
+  render();
+}
+
+const $refresh = document.getElementById("refresh");
+$refresh.onclick = async () => {
+  $refresh.classList.add("busy");
+  try { await load(); } finally { $refresh.classList.remove("busy"); }
+};
+load();
+</script>
+</body>
+</html>
