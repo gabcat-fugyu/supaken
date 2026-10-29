@@ -96,3 +96,17 @@ CREATE TABLE IF NOT EXISTS allowed_users (
   added_at  TEXT NOT NULL
 );
 
+
+-- ゲームアカウント(タグ)に付けたユニーク称号。まだ誰も登録していないアカウント用。
+-- そのアカウントを誰かがプロフィールで登録したら、その人の title_grants に移す
+CREATE TABLE IF NOT EXISTS tag_grants (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  tag        TEXT NOT NULL,
+  label      TEXT NOT NULL,
+  sub        TEXT,
+  year       TEXT,
+  design     TEXT NOT NULL,
+  shape      TEXT,
+  granted_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS tag_grants_tag ON tag_grants (tag);

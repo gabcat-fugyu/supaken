@@ -851,6 +851,8 @@ function ownedOf(user, p) {
   const map = new Map();
   for (const t of tags) for (const e of playerOf(t)?.earned || []) if (e?.id && !map.has(e.id)) map.set(e.id, e);
   for (const g of user?.grants || []) map.set(g.id, g);
+  // まだ誰も登録していないアカウントに管理人が付けた称号
+  if (!user) for (const g of roster.tagGrants?.[clean(p?.tag)] || []) map.set(g.id, g);
   return [...map.values()];
 }
 
@@ -1580,7 +1582,7 @@ let profileData = null, adminData = null, profileMsg = { err: "", ok: "" };
 // 称号: 持っている称号と付けている称号 / 編集中の内容 / 管理人の一覧
 let titleData = null, titleEdit = null, titleSlot = "top", titleMsg = { err: "", ok: "" };
 let adminGuests = null;
-let adminTitles = null, grantForm = { discordId: "", label: "", sub: "", year: "", design: "zap", shape: "" };
+let adminTitles = null, grantForm = { target: "", label: "", sub: "", year: "", design: "zap", shape: "" };
 
 function startTitleEdit() {
   const eq = titleData?.equip || {};
@@ -1862,10 +1864,15 @@ function grantBox() {
   const sample = { label: f.label || "称号の文字", sub: f.sub, year: f.year, design: f.design, shape: f.shape || "rect" };
   return `<div class="pf">
     <h3>管理(ユニーク称号を付ける)</h3>
-    <p class="note">ここで付けた称号はレアリティ「ユニーク」になります。形を決めると、本人は形を変えられません(炎の枠はここでだけ選べます)。</p>
+    <p class="note">ここで付けた称号はレアリティ「ユニーク」になります。まだログインしていない人には、ゲームアカウントに付けておけます(その人がアカウントを登録したら、その人の称号になります)。形を決めると、本人は形を変えられません(炎の枠はここでだけ選べます)。</p>
     <div class="pf-grid">
-      <select id="g-user"><option value="">付ける人</option>${users.map(u =>
-        `<option value="${esc(u.id)}"${u.id === f.discordId ? " selected" : ""}>${esc(u.name || u.id)}</option>`).join("")}</select>
+      <select id="g-user"><option value="">付ける人</option>
+        <optgroup label="ログインした人">${users.map(u =>
+          `<option value="d:${esc(u.id)}"${"d:" + u.id === f.target ? " selected" : ""}>${esc(u.name || u.id)}</option>`).join("")}</optgroup>
+        <optgroup label="ゲームアカウント(ログインしたらその人に移る)">${(index?.players || [])
+          .filter(p => !userOfTag(p.tag)).map(p => { const v = "t:" + clean(p.tag);
+            return `<option value="${esc(v)}"${v === f.target ? " selected" : ""}>${esc(p.label || p.name)} #${esc(clean(p.tag))}</option>`; }).join("")}</optgroup>
+      </select>
       <button class="cr-btn" id="g-4000">「レート4000到達」を入れる</button>
     </div>
     <div class="pf-row" style="margin-top:6px"><input id="g-label" maxlength="20" placeholder="称号の文字" value="${esc(f.label)}"></div>
@@ -1892,7 +1899,7 @@ function bindGrantBox() {
   if (!adminTitles) return;
   const $ = (id) => document.getElementById(id);
   const sync = () => {
-    grantForm = { discordId: $("g-user").value, label: $("g-label").value, sub: $("g-sub").value,
+    grantForm = { target: $("g-user").value, label: $("g-label").value, sub: $("g-sub").value,
                   year: $("g-year").value, design: $("g-design").value, shape: $("g-shape").value };
   };
   ["g-user", "g-design", "g-shape"].forEach(id => { $(id).onchange = () => { sync(); draw(); }; });

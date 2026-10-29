@@ -226,7 +226,12 @@ async function writeRoster(env) {
     const u = users.get(g.discord_id);
     if (u) (u.grants = u.grants || []).push(grantItem(g));
   }
-  const roster = { updatedAt: new Date().toISOString(), users: [...users.values()] };
+  // まだ誰も登録していないアカウントに付けた称号(順位表で、そのアカウントの行に出す)
+  const tagGrants = {};
+  for (const g of (await env.DB.prepare("SELECT * FROM tag_grants ORDER BY id").all()).results || []) {
+    (tagGrants[g.tag] = tagGrants[g.tag] || []).push({ ...grantItem(g), id: "t" + g.id });
+  }
+  const roster = { updatedAt: new Date().toISOString(), users: [...users.values()], tagGrants };
   await env.DATA.put("members/roster.json", JSON.stringify(roster), {
     httpMetadata: { contentType: "application/json; charset=utf-8" },
   });
@@ -291,8 +296,21 @@ async function accountAdd(request, env, id) {
   stmts.push(env.DB.prepare("INSERT INTO game_accounts (tag, discord_id, role, name, added_at) VALUES (?, ?, ?, ?, ?)")
     .bind(tag, id, role, player.name, new Date().toISOString()));
   await env.DB.batch(stmts);
+  await moveTagGrants(env, tag, id);
   await writeRoster(env);
   return json(await profile(env, id));
+}
+
+// そのアカウントに付いていたユニーク称号を、登録した人(Discord)のものにする
+async function moveTagGrants(env, tag, discordId) {
+  const { results } = await env.DB.prepare("SELECT * FROM tag_grants WHERE tag = ?").bind(tag).all();
+  if (!results || !results.length) return;
+  await env.DB.batch([
+    ...results.map((g) => env.DB.prepare(
+      "INSERT INTO title_grants (discord_id, label, sub, year, design, shape, granted_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).bind(discordId, g.label, g.sub, g.year, g.design, g.shape, g.granted_at)),
+    env.DB.prepare("DELETE FROM tag_grants WHERE tag = ?").bind(tag),
+  ]);
 }
 
 // アカウントを外す。メインを外したら、その人の一番古いサブをメインにする
@@ -414,7 +432,14 @@ async function adminTitlesData(env) {
     `SELECT u.id, COALESCE(p.display_name, u.name) AS name FROM discord_users u
      LEFT JOIN profiles p ON p.discord_id = u.id ORDER BY name`
   ).all()).results || [];
-  return { grants: grants.map((g) => ({ ...grantItem(g), userId: g.discord_id, userName: g.user_name })), users };
+  const tagGrants = (await env.DB.prepare("SELECT * FROM tag_grants ORDER BY id DESC").all()).results || [];
+  return {
+    grants: [
+      ...tagGrants.map((g) => ({ ...grantItem(g), id: "t" + g.id, tag: g.tag, userName: `#${g.tag}(まだ登録されていないアカウント)` })),
+      ...grants.map((g) => ({ ...grantItem(g), userId: g.discord_id, userName: g.user_name })),
+    ],
+    users,
+  };
 }
 
 // ---- メン限ロールが無くても入れる人 ----
@@ -457,25 +482,45 @@ async function adminGuestRemove(request, env) {
 
 async function adminGrant(request, env) {
   const b = await readBody(request);
-  const uid = String(b.discordId || "");
+  // 付ける相手は "d:<DiscordID>"(ログインした人) か "t:<タグ>"(ゲームアカウント)
+  const target = String(b.target || (b.discordId ? "d:" + b.discordId : ""));
+  let uid = target.startsWith("d:") ? target.slice(2) : "";
+  const tag = target.startsWith("t:") ? cleanTag(target.slice(2)) : "";
   const label = String(b.label || "").trim();
-  if (!uid || !(await env.DB.prepare("SELECT id FROM discord_users WHERE id = ?").bind(uid).first())) {
+  if (tag) {
+    // もう誰かが登録しているアカウントなら、その人に付ける
+    const owner = await env.DB.prepare("SELECT discord_id FROM game_accounts WHERE tag = ?").bind(tag).first();
+    if (owner) uid = owner.discord_id;
+  } else if (!uid || !(await env.DB.prepare("SELECT id FROM discord_users WHERE id = ?").bind(uid).first())) {
     return fail(400, "付ける人を選んでください");
   }
   if (!label) return fail(400, "称号の文字を入れてください");
   if ([...label].length > 20) return fail(400, "称号の文字は20文字までです");
   const design = DESIGN_IDS.includes(b.design) ? b.design : "zap";
   const shape = ALL_SHAPES.includes(b.shape) ? b.shape : "";
-  await env.DB.prepare(
-    "INSERT INTO title_grants (discord_id, label, sub, year, design, shape, granted_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
-  ).bind(uid, label, String(b.sub || "").trim().slice(0, 24), String(b.year || "").trim().slice(0, 8),
-    design, shape, new Date().toISOString()).run();
+  const vals = [label, String(b.sub || "").trim().slice(0, 24), String(b.year || "").trim().slice(0, 8),
+    design, shape, new Date().toISOString()];
+  if (uid) {
+    await env.DB.prepare(
+      "INSERT INTO title_grants (discord_id, label, sub, year, design, shape, granted_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).bind(uid, ...vals).run();
+  } else {
+    await env.DB.prepare(
+      "INSERT INTO tag_grants (tag, label, sub, year, design, shape, granted_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).bind(tag, ...vals).run();
+  }
   await writeRoster(env);
   return adminTitles(env);
 }
 
 async function adminRevoke(request, env) {
-  const gid = Number(String((await readBody(request)).id || "").replace(/^g/, ""));
+  const raw = String((await readBody(request)).id || "");
+  if (raw.startsWith("t")) {                       // まだ登録されていないアカウントに付けた称号
+    await env.DB.prepare("DELETE FROM tag_grants WHERE id = ?").bind(Number(raw.slice(1)) || 0).run();
+    await writeRoster(env);
+    return adminTitles(env);
+  }
+  const gid = Number(raw.replace(/^g/, ""));
   if (!gid) return fail(400, "bad id");
   await env.DB.batch([
     env.DB.prepare("DELETE FROM title_grants WHERE id = ?").bind(gid),
