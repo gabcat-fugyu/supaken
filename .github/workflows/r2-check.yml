@@ -57,3 +57,28 @@ jobs:
           except urllib.error.HTTPError as e:
               print("失敗:", e.code, e.read()[:300]); raise SystemExit(1)
           PY
+      - name: Cloudflareの合鍵
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          python - <<'PY'
+          import os, json, urllib.request, urllib.error
+          tok = os.environ.get("CLOUDFLARE_API_TOKEN", "").strip()
+          acc = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "").strip()
+          print("TOKEN", "OK" if tok else "未登録", "/ ACCOUNT_ID", f"{len(acc)}文字" if acc else "未登録")
+          def get(path):
+              req = urllib.request.Request("https://api.cloudflare.com/client/v4" + path,
+                                           headers={"Authorization": f"Bearer {tok}"})
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as r:
+                      return json.loads(r.read())
+              except urllib.error.HTTPError as e:
+                  return json.loads(e.read() or b"{}")
+          v = get("/user/tokens/verify"); print("トークン:", v.get("success"), (v.get("result") or {}).get("status"), v.get("errors"))
+          z = get("/zones?name=supaken.com"); print("supaken.com:", [(x["name"], x["status"]) for x in z.get("result") or []], z.get("errors"))
+          d = get(f"/accounts/{acc}/d1/database"); print("D1:", d.get("success"), d.get("errors"))
+          w = get(f"/accounts/{acc}/workers/scripts"); print("Workers:", w.get("success"), w.get("errors"))
+          ok = v.get("success") and z.get("result") and d.get("success") and w.get("success")
+          raise SystemExit(0 if ok else 1)
+          PY
