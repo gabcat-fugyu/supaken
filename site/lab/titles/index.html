@@ -33,6 +33,8 @@
   .panel input:focus, .panel select:focus { outline: none; border-color: var(--gold); }
   .row2 { display: grid; grid-template-columns: 1fr 96px; gap: 8px; }
   .designs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+  .design-group { margin: 10px 0 5px; font-size: 10.5px; font-weight: 800; color: var(--gold-lite); }
+  .design-group:first-child { margin-top: 0; }
   .design-btn {
     display: grid; place-items: center; gap: 6px; padding: 9px 4px 8px; border-radius: 11px; cursor: pointer;
     background: rgba(6,16,40,0.5); border: 2px solid rgba(120,170,240,0.3); color: var(--ink-dim);
@@ -177,9 +179,11 @@ function draw() {
   const who = Number($("f-who").value || 0);
   const more = $("f-more").checked;
 
-  $("designs").innerHTML = Titles.DESIGNS.map(d =>
-    `<button class="design-btn${d.id === design ? " on" : ""}" data-d="${d.id}">${Titles.html({ label: d.name, design: d.id })}${esc(d.name)}</button>`
-  ).join("");
+  const GROUPS = [["rarity", "レアリティ(下から順に)"], ["limited", "限定・一点もの"], ["auto", "自動で付く称号"]];
+  $("designs").innerHTML = GROUPS.map(([g, title]) => `<div class="design-group" style="grid-column:1/-1">${title}</div>` +
+    Titles.DESIGNS.filter(d => d.group === g).map(d =>
+      `<button class="design-btn${d.id === design ? " on" : ""}" data-d="${d.id}">${Titles.html({ label: "見本", design: d.id })}${esc(d.name)}</button>`
+    ).join("")).join("");
   $("designs").querySelectorAll("[data-d]").forEach(b => { b.onclick = () => { design = b.dataset.d; draw(); }; });
 
   $("board").innerHTML = people.map((p, i) => {
@@ -204,7 +208,7 @@ function draw() {
     <div class="banner-league">${esc(LEAGUE_NAMES[p.league] || "")}</div>
   </div>`;
 
-  $("gallery").innerHTML = Titles.DESIGNS.map(d => `<div class="gallery-item">
+  $("gallery").innerHTML = Titles.DESIGNS.filter(d => d.group !== "auto").map(d => `<div class="gallery-item">
     <small>${esc(d.name)}</small>
     ${Titles.html({ ...t, design: d.id })}
     ${Titles.html({ ...t, design: d.id }, { big: true })}

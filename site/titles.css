@@ -41,8 +41,9 @@
 
 @keyframes ttl-spin { to { --ttl-a: 360deg; } }
 
-/* 光が走る(金・氷・標準) */
-.ttl-gold::after, .ttl-ice::after, .ttl-std::after {
+/* 光が走る */
+.ttl-gold::after, .ttl-champion::after, .ttl-ice::after, .ttl-std::after,
+.ttl-rare::after, .ttl-super::after, .ttl-platinum::after, .ttl-diamond::after, .ttl-emerald::after {
   content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%;
   background: linear-gradient(100deg, transparent, rgba(255,255,255,0.55), transparent);
   transform: skewX(-20deg); animation: ttl-shine 3.4s ease-in-out infinite; pointer-events: none;
@@ -67,7 +68,72 @@
 .ttl-rainbow b { background-size: 200% 100%; animation: ttl-flow 3s linear infinite; }
 @keyframes ttl-flow { to { background-position: 200% 0; } }
 
-/* ---- デザイン ---- */
+/* ---- レアリティ(下から順に) ----
+   縁が回るのはウルトラレアから。ノーマル〜スーパーレアは落ち着いた札 */
+.ttl-normal, .ttl-rare, .ttl-super { animation: none; }
+.ttl-normal {       /* ノーマル: 青みがかった灰色。光らない */
+  background: linear-gradient(180deg, #3d4c68, #1b2537);
+  border: 1.5px solid #8ea3c4; box-shadow: none;
+  --txt: linear-gradient(180deg, #ffffff, #d5deee);
+  --ico: #c7d3ea; --ico-glow: transparent;
+}
+.ttl-rare {         /* レア: オレンジ。ときどき光が走る */
+  background: linear-gradient(180deg, #6a3507, #2a1400);
+  border: 1.5px solid #ff9f3d; box-shadow: 0 0 6px -2px rgba(255,159,61,0.6);
+  --txt: linear-gradient(180deg, #fff3e2, #ffc27a);
+  --ico: #ffb15a; --ico-glow: rgba(255,159,61,0.7);
+}
+.ttl-super {        /* スーパーレア: 紫。ふわっと光る */
+  background: linear-gradient(180deg, #47197f, #170833);
+  border: 1.5px solid #c27bff; box-shadow: 0 0 12px -2px rgba(176,76,255,0.8);
+  --txt: linear-gradient(180deg, #ffffff, #e6ccff 50%, #c99aff);
+  --ico: #d9a8ff; --ico-glow: rgba(176,76,255,0.9);
+  animation: ttl-pulse 2.6s ease-in-out infinite;
+}
+@keyframes ttl-pulse {
+  0%, 100% { box-shadow: 0 0 8px -2px rgba(176,76,255,0.6); }
+  50%      { box-shadow: 0 0 16px 0 rgba(196,110,255,0.95); }
+}
+/* ウルトラレアの候補(虹は限定に回すので、それ以外で3つ) */
+.ttl-platinum {     /* 白銀: 白と銀の縁が回る */
+  --bg1: #34404f; --bg2: #0c1118;
+  --ring: #ffffff, #9aa7b8, #e9eef5, #6c7888, #ffffff, #c3cdd9, #ffffff;
+  --txt: linear-gradient(180deg, #ffffff 0%, #eef2f7 45%, #a9b6c6 60%, #ffffff 100%);
+  --ico: #f2f6fb; --ico-glow: rgba(255,255,255,0.85); --glow: rgba(220,230,245,0.6);
+}
+.ttl-diamond {      /* ダイヤ: 白と水色のきらめき */
+  --bg1: #0f3044; --bg2: #03121b;
+  --ring: #ffffff, #7fe7ff, #ffffff, #2fb8e6, #e6fbff, #8ad0ff, #ffffff;
+  --txt: linear-gradient(180deg, #ffffff 0%, #e6fbff 45%, #7fdcff 62%, #ffffff 100%);
+  --ico: #c9f6ff; --ico-glow: #4fd6ff; --glow: rgba(90,215,255,0.7);
+  --spin: 3s;
+}
+.ttl-emerald {      /* 翡翠: 緑と白の縁 */
+  --bg1: #0c3d2b; --bg2: #02150d;
+  --ring: #e9fff4, #3ddc97, #0a7a4e, #ffffff, #7ff0c0, #0f5a3c, #e9fff4;
+  --txt: linear-gradient(180deg, #ffffff 0%, #ddfff0 45%, #6fe3b0 62%, #f0fff8 100%);
+  --ico: #8ff5c8; --ico-glow: #22c98a; --glow: rgba(50,210,140,0.7);
+}
+.ttl-champion {     /* チャンピオン: 金の縁が回り、光の粒が舞う */
+  --bg1: #3d2905; --bg2: #120a00;
+  --ring: #fff6d0, #ffd23f, #b8790a, #ffffff, #ffd23f, #7a4d05, #fff6d0;
+  --txt: linear-gradient(180deg, #fffbe6 0%, #ffe07a 45%, #ffb300 55%, #fff1b8 100%);
+  --ico: #ffd23f; --ico-glow: rgba(255,200,60,0.9); --glow: rgba(255,200,60,0.8);
+}
+.ttl-champion::before {          /* 光の粒 */
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image:
+    radial-gradient(1.5px 1.5px at 12% 80%, #fff6d0 50%, transparent 51%),
+    radial-gradient(1.2px 1.2px at 33% 60%, #ffe07a 50%, transparent 51%),
+    radial-gradient(1.6px 1.6px at 58% 90%, #ffffff 50%, transparent 51%),
+    radial-gradient(1.2px 1.2px at 79% 70%, #ffd23f 50%, transparent 51%),
+    radial-gradient(1.4px 1.4px at 92% 95%, #fff6d0 50%, transparent 51%);
+  background-repeat: repeat-y; background-size: 100% 100%;
+  animation: ttl-rise 2.8s linear infinite;
+}
+@keyframes ttl-rise { from { background-position: 0 0; } to { background-position: 0 -100%; } }
+
+/* ---- 限定・一点もの ---- */
 .ttl-zap {          /* 紫電撃: 闇色の地に、銀と紫の光が回る縁 */
   --bg1: #3a1470; --bg2: #0b0320;
   --ring: #f7f3ff, #8f86ad, #c77dff, #ffffff, #e8c98a, #6f6593, #e2b8ff, #f7f3ff;
@@ -122,6 +188,6 @@
 .ttl-std.big { border-width: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .ttl, .ttl svg, .ttl b { animation: none !important; }
+  .ttl, .ttl svg, .ttl b, .ttl::before { animation: none !important; }
   .ttl::after { display: none; }
 }

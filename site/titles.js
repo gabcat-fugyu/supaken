@@ -10,22 +10,33 @@ window.Titles = (function () {
     flame: `<path d="M12 1.5c.8 3.4-1.7 5.2-2.9 7.3-1 1.7-.6 3.4.5 4.3-.3-1.6.6-2.8 1.8-3.8 1.4 2 3.9 3.2 3.9 6.3 0 1-.3 1.9-.8 2.6 2.4-.8 4-3.1 4-5.8 0-4.6-3.6-6.4-6.5-11zM12 22.5c-3.6 0-6.5-2.6-6.5-6 0-2 .9-3.6 2.2-4.8-.1 2.6 1.6 3.9 3.3 3.9-1-2.6 1-4.4 2.1-5.6.4 2.5 3.4 3.6 3.4 6.8 0 3.2-2 5.7-4.5 5.7z"/>`,
     snow:  `<path d="M11 1h2v4.2l2.6-1.6 1 1.7L13 7.6V11h3.4l2.3-3.6 1.7 1-1.6 2.6H23v2h-4.2l1.6 2.6-1.7 1-2.3-3.6H13v3.4l3.6 2.3-1 1.7-2.6-1.6V23h-2v-4.2l-2.6 1.6-1-1.7 3.6-2.3V13H7.6l-2.3 3.6-1.7-1L5.2 13H1v-2h4.2L3.6 8.4l1.7-1L7.6 11H11V7.6L7.4 5.3l1-1.7L11 5.2z"/>`,
     star:  `<path d="M12 1.5l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7L2 8.7l7.1-.6z"/>`,
+    gem:   `<path d="M6.5 3h11l4.5 6-10 12.5L2 9zm1 2.2L5.3 8.4h4.2zm9 0-2 3.2h4.2zM12 4.9l-2.1 3.5h4.2zM4.9 10.4l5.7 7.2-2-7.2zm9.2 0-2.1 7.4 5.9-7.4zm-3.5 0L12 15.6l1.5-5.2z"/>`,
+    shield:`<path d="M12 1.5 3.5 5v6.2c0 5.3 3.6 9.8 8.5 11.3 4.9-1.5 8.5-6 8.5-11.3V5z"/>`,
   };
 
+  // group: rarity … レアリティ(下から順に) / limited … 限定・一点もの / auto … 自動で付く称号
   const DESIGNS = [
-    { id: "zap",     name: "紫電撃", icon: "zap" },
-    { id: "gold",    name: "金",     icon: "crown" },
-    { id: "flame",   name: "赤炎",   icon: "flame" },
-    { id: "ice",     name: "青氷",   icon: "snow" },
-    { id: "rainbow", name: "虹",     icon: "star" },
-    { id: "std",     name: "標準",   icon: "star" },   // 自動の称号(20勝達成など)
+    { id: "normal",   name: "ノーマル",     group: "rarity",  rank: 1, icon: "shield" },
+    { id: "rare",     name: "レア",         group: "rarity",  rank: 2, icon: "star" },
+    { id: "super",    name: "スーパーレア", group: "rarity",  rank: 3, icon: "gem" },
+    { id: "platinum", name: "ウルトラレア(白銀)", group: "rarity", rank: 4, icon: "gem" },
+    { id: "diamond",  name: "ウルトラレア(ダイヤ)", group: "rarity", rank: 4, icon: "gem" },
+    { id: "emerald",  name: "ウルトラレア(翡翠)", group: "rarity", rank: 4, icon: "gem" },
+    { id: "champion", name: "チャンピオン", group: "rarity",  rank: 5, icon: "crown" },
+    { id: "zap",      name: "紫電撃",       group: "limited", rank: 6, icon: "zap" },
+    { id: "flame",    name: "赤炎",         group: "limited", rank: 6, icon: "flame" },
+    { id: "ice",      name: "青氷",         group: "limited", rank: 6, icon: "snow" },
+    { id: "rainbow",  name: "虹",           group: "limited", rank: 6, icon: "star" },
+    { id: "std",      name: "標準(自動)",   group: "auto",    rank: 3, icon: "star" },
   ];
+  const ALIASES = { gold: "champion" };   // 昔の名前
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
   function html(t, opts = {}) {
-    const d = DESIGNS.find((x) => x.id === t.design) || DESIGNS[0];
+    const id = ALIASES[t.design] || t.design;
+    const d = DESIGNS.find((x) => x.id === id) || DESIGNS[0];
     const icon = ICONS[t.icon] || ICONS[d.icon];
     const subText = [t.sub, t.year].filter(Boolean).join(" · ");
     return `<span class="ttl ttl-${d.id}${opts.big ? " big" : ""}" title="${esc(t.label)}">` +
