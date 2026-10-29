@@ -43,6 +43,13 @@
   .design-btn.on { border-color: var(--gold); color: var(--gold-lite); background: rgba(255,210,63,0.08); }
   .check { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12px; }
   .check input { width: auto; }
+  .slot-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+  .slot-btn {
+    padding: 9px; border-radius: 10px; cursor: pointer; font: inherit; font-size: 12px; font-weight: 800;
+    color: var(--ink-dim); background: rgba(6,16,40,0.5); border: 2px solid rgba(120,170,240,0.3);
+  }
+  .slot-btn.on { color: #3d2600; border-color: var(--gold-deep); background: linear-gradient(180deg, var(--gold-lite), var(--gold)); }
+  .plate-titles.bottom { margin: 3px 0 0; }
 
   /* 順位表(メン限ページと同じ見た目) */
   .plate {
@@ -108,11 +115,16 @@
   <p class="sect-note">称号の見た目を試すページです。ここで変えても、本当の順位表には何も付きません。</p>
 
   <div class="panel">
+    <div class="slot-tabs">
+      <button class="slot-btn on" data-slot="top">上の称号</button>
+      <button class="slot-btn" data-slot="bottom">下の称号</button>
+    </div>
+    <label class="check" style="margin:0 0 4px"><input type="checkbox" id="f-on" checked> この位置に称号を付ける</label>
     <label for="f-label">称号の文字</label>
-    <input id="f-label" maxlength="24" value="スパーキー日本最速20勝">
+    <input id="f-label" maxlength="24">
     <div class="row2">
-      <div><label for="f-sub">小見出し(大きい札の上に出る英字など)</label><input id="f-sub" maxlength="24" value="JAPAN FASTEST"></div>
-      <div><label for="f-year">年</label><input id="f-year" inputmode="numeric" maxlength="4" value="2026"></div>
+      <div><label for="f-sub">小見出し(大きい札の上に出る英字など)</label><input id="f-sub" maxlength="24"></div>
+      <div><label for="f-year">年</label><input id="f-year" inputmode="numeric" maxlength="4"></div>
     </div>
     <label>デザイン</label>
     <div class="designs" id="designs"></div>
@@ -151,7 +163,20 @@ let people = [
   { name: "プレイヤーC", league: 7, rating: 2500 }, { name: "プレイヤーD", league: 7, rating: 2300 },
   { name: "プレイヤーE", league: 6, rating: null }, { name: "プレイヤーF", league: 5, rating: null },
 ];
-let design = "zap";
+// 上と下に1つずつ付けられる
+const slots = {
+  top:    { on: true, label: "スパーキー日本最速20勝", sub: "JAPAN FASTEST", year: "2026", design: "zap" },
+  bottom: { on: true, label: "スパ研", sub: "", year: "", design: "rare" },
+};
+let editing = "top";
+
+// 入力欄を、いま編集している位置の値にそろえる
+function fillForm() {
+  const t = slots[editing];
+  $("f-on").checked = t.on;
+  $("f-label").value = t.label; $("f-sub").value = t.sub; $("f-year").value = t.year;
+  document.querySelectorAll("[data-slot]").forEach(b => b.classList.toggle("on", b.dataset.slot === editing));
+}
 
 async function loadPeople() {
   try {
@@ -170,12 +195,17 @@ async function loadPeople() {
   draw();
 }
 
-function current() {
-  return { label: $("f-label").value || "称号", sub: $("f-sub").value, year: $("f-year").value, design };
+function readForm() {
+  Object.assign(slots[editing], {
+    on: $("f-on").checked, label: $("f-label").value, sub: $("f-sub").value, year: $("f-year").value,
+  });
 }
+const shown = (slot) => slots[slot].on && slots[slot].label ? slots[slot] : null;
 
 function draw() {
-  const t = current();
+  const t = { ...slots[editing], label: slots[editing].label || "称号" };
+  const design = t.design;
+  const top = shown("top"), bottom = shown("bottom");
   const who = Number($("f-who").value || 0);
   const more = $("f-more").checked;
 
@@ -184,17 +214,19 @@ function draw() {
     Titles.DESIGNS.filter(d => d.group === g).map(d =>
       `<button class="design-btn${d.id === design ? " on" : ""}" data-d="${d.id}">${Titles.html({ label: "見本", design: d.id })}${esc(d.name)}</button>`
     ).join("")).join("");
-  $("designs").querySelectorAll("[data-d]").forEach(b => { b.onclick = () => { design = b.dataset.d; draw(); }; });
+  $("designs").querySelectorAll("[data-d]").forEach(b => { b.onclick = () => { slots[editing].design = b.dataset.d; draw(); }; });
 
   $("board").innerHTML = people.map((p, i) => {
     const cls = i === 0 ? " gold" : i === 1 ? " silver" : i === 2 ? " bronze" : "";
-    const titles = i === who
-      ? `<span class="plate-titles">${Titles.html({ label: t.label, design: t.design })}${more ? `<span class="t-more">+1</span>` : ""}</span>` : "";
+    const titles = i === who && top
+      ? `<span class="plate-titles">${Titles.html({ label: top.label, design: top.design })}${more ? `<span class="t-more">+1</span>` : ""}</span>` : "";
+    const under = i === who && bottom
+      ? `<span class="plate-titles bottom">${Titles.html({ label: bottom.label, design: bottom.design })}</span>` : "";
     const val = p.league === 7 && p.rating != null ? p.rating : `<span style="font-size:12px">${esc(LEAGUE_NAMES[p.league] || "")}</span>`;
     return `<div class="plate${cls}${i === who ? " pick" : ""}">
       <span class="medal">${i + 1}</span>${shield(p.league, "shield")}
       <span class="plate-body">${titles}<span class="plate-name">${esc(p.name)}</span>
-        <span class="plate-sub">${p.league === 7 ? "天界" : esc(LEAGUE_NAMES[p.league] || "")}</span></span>
+        <span class="plate-sub">${p.league === 7 ? "天界" : esc(LEAGUE_NAMES[p.league] || "")}</span>${under}</span>
       <span class="plate-value">${val}</span>
     </div>`;
   }).join("");
@@ -202,7 +234,8 @@ function draw() {
   const p = people[who] || people[0];
   $("banner").innerHTML = `<div class="banner">
     <div class="banner-name">${esc(p.name)}</div>
-    <div class="title-row">${Titles.html(t, { big: true })}</div>
+    ${top ? `<div class="title-row">${Titles.html(top, { big: true })}</div>` : ""}
+    ${bottom ? `<div class="title-row">${Titles.html(bottom, { big: true })}</div>` : ""}
     ${more ? `<div class="title-row">${Titles.html({ label: "20勝達成", design: "std" })}</div>` : ""}
     ${shield(p.league, "banner-shield")}
     <div class="banner-league">${esc(LEAGUE_NAMES[p.league] || "")}</div>
@@ -215,7 +248,12 @@ function draw() {
   </div>`).join("");
 }
 
-for (const id of ["f-label", "f-sub", "f-year"]) $(id).addEventListener("input", draw);
+for (const id of ["f-label", "f-sub", "f-year"]) $(id).addEventListener("input", () => { readForm(); draw(); });
+$("f-on").addEventListener("change", () => { readForm(); draw(); });
+document.querySelectorAll("[data-slot]").forEach(b => {
+  b.onclick = () => { readForm(); editing = b.dataset.slot; fillForm(); draw(); };
+});
+fillForm();
 $("f-who").addEventListener("change", draw);
 $("f-more").addEventListener("change", draw);
 loadPeople();
