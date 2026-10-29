@@ -1008,6 +1008,11 @@ def main():
     if failed == len(entries):
         raise SystemExit("1人も取得できませんでした。players.json を確認してください")
 
+    # 称号の付き具合(GitHub の実行結果の画面に出す)
+    with_titles = [s for s in summaries if s.get("earned")]
+    total = sum(len(s.get("earned") or []) for s in summaries)
+    print(f"::notice::称号: {len(with_titles)}/{len(summaries)}人に合計{total}個")
+
     note = f"(うち{failed}人は取得できず前回の結果を表示)" if failed else ""
     print(f"完了: {len(summaries)}/{len(entries)}人 {note}")
 
