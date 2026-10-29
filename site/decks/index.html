@@ -143,13 +143,14 @@ function render() {
   const b = boards.find(x => x.key === boardKey) || boards[0];
   if (!b) { $main.innerHTML = `<div class="notice">集計結果がありません。</div>`; return; }
 
-  let list = [...(b.decks || [])];
+  // 使用率は「使っている人の割合」。1人が何試合使っても1人と数える
+  let list = [...(b.decks || [])].sort((x, y) => (y.players - x.players) || (y.battles - x.battles));
   if (sortId === "win") {
     list = list.filter(d => d.wins + d.losses >= 20).sort((x, y) => winRate(y) - winRate(x));
   }
 
   const rows = list.slice(0, shown).map((d, i) => {
-    const use = b.battles ? d.battles / b.battles * 100 : 0;
+    const use = b.players ? d.players / b.players * 100 : 0;
     const wr = winRate(d);
     const costs = d.cards.map(([id]) => card(id).e).filter(v => typeof v === "number");
     const avg = costs.length ? (costs.reduce((a, c) => a + c, 0) / costs.length).toFixed(1) : null;
@@ -159,8 +160,8 @@ function render() {
       <div class="deck-head">
         <span class="rank${i < 3 ? " g" + (i + 1) : ""}">${i + 1}</span>
         <span class="stats">
-          <span class="stat"><b>${use.toFixed(1)}<u>%</u></b><small>使用率(${d.battles}試合)</small></span>
-          <span class="stat"><b>${d.players}<u>人</u></b><small>使っている人</small></span>
+          <span class="stat"><b>${use.toFixed(1)}<u>%</u></b><small>使用率(${d.players}人)</small></span>
+          <span class="stat"><b>${d.battles}<u>戦</u></b><small>使われた試合</small></span>
           <span class="stat win"><b>${wr == null ? "—" : wr.toFixed(1) + "<u>%</u>"}</b><small>勝率</small></span>
         </span>
       </div>
@@ -178,8 +179,8 @@ function render() {
       `<button class="cr-btn${x.key === b.key ? " on" : ""}" data-board="${esc(x.key)}">${esc(x.label)}</button>`).join("")}</div>
     <div class="rail sub">${SORTS.map(s =>
       `<button class="cr-btn${s.id === sortId ? " on" : ""}" data-sort="${s.id}">${esc(s.label)}</button>`).join("")}</div>
-    <p class="summary">${esc(b.label)}の<b>${b.players}人</b>が、直近${esc(data.days || 7)}日の天界で使ったデッキ(<b>${b.battles}試合</b>)を数えています。
-      進化・ヒーローの付け方が違えば別のデッキとして数えます。${b.stale ? "<br>※今回は集計できなかったので、前回の結果です。" : ""}
+    <p class="summary">${esc(b.label)}のうち、直近${esc(data.days || 7)}日に天界で対戦した<b>${b.players}人</b>(<b>${b.battles}試合</b>)のデッキを数えています。
+      使用率は「そのデッキを使った人の割合」です(1人が何試合使っても1人)。進化・ヒーローの付け方が違えば別のデッキとして数えます。${b.stale ? "<br>※今回は集計できなかったので、前回の結果です。" : ""}
       ${data.updatedAt ? `<br>更新 ${esc(ago(data.updatedAt))}` : ""}</p>
     ${rows || `<div class="notice">まだデータがありません。</div>`}
     ${shown < list.length ? `<button class="cr-btn more" id="more">さらに${Math.min(PAGE, list.length - shown)}個</button>` : ""}`;
