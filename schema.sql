@@ -92,15 +92,7 @@ CREATE TABLE IF NOT EXISTS title_equips (
 -- メン限ロールが無くても入れる人(管理人が許可する)
 CREATE TABLE IF NOT EXISTS allowed_users (
   id        TEXT PRIMARY KEY,          -- Discord ユーザーID
-  name      TEXT,
+  name      TEXT,                     -- 覚え書き(誰か分かるように)
   added_at  TEXT NOT NULL
 );
 
--- ロールが無くて入れなかった人(管理人が「許可する」を押せるように残す)
-CREATE TABLE IF NOT EXISTS denied_logins (
-  id        TEXT PRIMARY KEY,
-  name      TEXT,
-  avatar    TEXT,
-  reason    TEXT,
-  at        TEXT NOT NULL
-);

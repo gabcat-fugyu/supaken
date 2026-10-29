@@ -647,8 +647,8 @@ async function api(path, body) {
 
 // Discord から戻ってきたときの理由(?login=...)
 const LOGIN_MESSAGES = {
-  role: "スパ研のメン限ロールが確認できませんでした。メンバーシップに入っているか、Discord のアカウントが合っているか確かめてください。メンバー以外の人は、管理人に許可してもらうと入れます。",
-  guild: "スパ研の Discord サーバーに入っていないようです。先にサーバーに参加してください。メンバー以外の人は、管理人に許可してもらうと入れます。",
+  role: "スパ研のメン限ロールが確認できませんでした。メンバーシップに入っているか、Discord のアカウントが合っているか確かめてください。メンバー以外の人は、管理人に Discord のユーザーIDを伝えて許可してもらうと入れます。",
+  guild: "スパ研の Discord サーバーに入っていないようです。先にサーバーに参加してください。メンバー以外の人は、管理人に Discord のユーザーIDを伝えて許可してもらうと入れます。",
   cancel: "ログインをキャンセルしました。",
   expired: "時間がたちすぎたので、もう一度ログインしてください。",
   error: "Discord とのやり取りに失敗しました。少し待ってからもう一度試してください。",
@@ -1729,26 +1729,22 @@ function drawProfile() {
 }
 
 // ---- 管理人: メン限ロールが無くても入れる人 ----
+// Discord のユーザーIDで許可する
 function guestBox() {
-  const when = (iso) => iso ? new Date(iso).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
-  const why = { role: "ロールなし", guild: "サーバー外" };
   return `<div class="pf">
     <h3>管理(メンバー以外で入れる人)</h3>
     <p class="note">ここに入れた人は、メン限ロールが無くても(サーバーに入っていなくても) Discord でログインして入れます。外すとすぐ入れなくなります。</p>
-    <div class="t-label">入ろうとして入れなかった人</div>
-    ${(adminGuests.denied || []).map(d => `<div class="acc">
-      ${d.avatar ? `<img src="${esc(d.avatar)}" alt="" style="width:28px;height:28px;border-radius:50%">` : ""}
-      <span class="acc-body"><b>${esc(d.name || d.id)}</b><small>${esc(why[d.reason] || "")} · ${esc(when(d.at))}</small></span>
-      <span class="acc-btns"><button class="cr-btn go gold" data-guest-add="${esc(d.id)}">許可する</button></span>
-    </div>`).join("") || `<p class="note">いません。許可したい人に、一度ログインを試してもらうとここに出ます。</p>`}
+    <div class="pf-grid">
+      <input id="guest-id" inputmode="numeric" placeholder="Discord のユーザーID">
+      <input id="guest-name" maxlength="32" placeholder="誰か(覚え書き・任意)">
+    </div>
+    <div style="margin-top:6px"><button class="cr-btn go gold" id="guest-add">許可する</button></div>
     <div class="t-label">許可している人</div>
     ${(adminGuests.allowed || []).map(a => `<div class="acc">
-      <span class="acc-body"><b>${esc(a.name || "(名前不明)")}</b><small>ID ${esc(a.id)}</small></span>
+      <span class="acc-body"><b>${esc(a.name || a.memo || "(まだログインしていません)")}</b><small>${
+        a.memo && a.name ? `${esc(a.memo)} · ` : ""}ID ${esc(a.id)}${a.lastLogin ? "" : " · まだログインしていません"}</small></span>
       <span class="acc-btns"><button class="cr-btn" data-guest-remove="${esc(a.id)}">外す</button></span>
     </div>`).join("") || `<p class="note">まだいません。</p>`}
-    <div class="t-label">IDで直接入れる</div>
-    <div class="pf-row"><input id="guest-id" inputmode="numeric" placeholder="Discord のユーザーID">
-      <button class="cr-btn go gold" id="guest-add">許可</button></div>
   </div>`;
 }
 
@@ -1760,172 +1756,13 @@ function bindGuestBox() {
     catch (e) { profileMsg.err = e.message; alert(e.message); }
     draw();
   };
-  $main.querySelectorAll("[data-guest-add]").forEach(b => {
-    b.onclick = () => go("/api/admin/guests/add", { id: b.dataset.guestAdd }, "許可しました");
-  });
   $main.querySelectorAll("[data-guest-remove]").forEach(b => {
     b.onclick = () => { if (confirm("この人の許可を外しますか？(ログイン中なら追い出されます)"))
       go("/api/admin/guests/remove", { id: b.dataset.guestRemove }, "外しました"); };
   });
   const add = document.getElementById("guest-add");
-  if (add) add.onclick = () => go("/api/admin/guests/add", { id: document.getElementById("guest-id").value }, "許可しました");
-}
-
-// ---- プロフィール: 称号を付ける ----
-// 上(名前の上)と下(名前の下)に1つずつ。形は自由(炎の枠は選べない。管理人が形を決めた称号はその形)
-const USER_SHAPES = Titles.SHAPES.filter(x => x.id !== "blaze");
-
-function titleBox(who) {
-  if (!titleData || !titleEdit) return "";
-  const owned = titleData.owned || [];
-  const list = byRarity(owned);
-  const v = titleEdit[titleSlot];
-  const cur = v && v !== "auto" ? list.find(t => t.id === v.id) : null;
-  const top = pickTitle(owned, titleEdit.top, "top");
-  const bottom = pickTitle(owned, titleEdit.bottom, "bottom");
-
-  const choice = (val, inner, on) => `<button class="tchoice${on ? " on" : ""}" data-tc="${esc(val)}">${inner}</button>`;
-  const choices = [
-    titleSlot === "top" ? choice("auto", "おまかせ(一番レアなもの)", v === "auto") : "",
-    choice("none", "なし", v === null || (titleSlot === "bottom" && v === "auto")),
-    ...list.map(t => choice(t.id, titleHtml({ ...t, shape: t.fixedShape || "rect" }), cur?.id === t.id)),
-  ].join("");
-
-  let shapes = "";
-  if (cur && cur.fixedShape) {
-    shapes = `<p class="note">この称号は形が決まっています。</p>`;
-  } else if (cur) {
-    shapes = `<div class="t-choices">${USER_SHAPES.map(sh =>
-      `<button class="tchoice${(v.shape || "rect") === sh.id ? " on" : ""}" data-tsh="${sh.id}">${
-        titleHtml({ ...cur, shape: sh.id })}</button>`).join("")}</div>`;
-  }
-
-  const have = new Set(owned.map(e => e.id.replace(/^crl20-\d{4}$/, "crl20")));
-  const catalog = Titles.CATS.map(c => `<div class="t-cat">${esc(c.name)}</div><div class="t-cat-list">${
-    Titles.CATALOG.filter(x => x.cat === c.id).map(x => {
-      const r = Titles.RARITY[x.rarity];
-      const shown = { label: x.label, design: r.design };
-      return `<div class="t-item${have.has(x.id) ? "" : " locked"}">${titleHtml(shown)}
-        <span class="t-rar">${esc(r.name)}</span><small>${esc(x.how)}</small></div>`;
-    }).join("")}</div>`).join("");
-
-  return `<div class="pf">
-    <h3>称号</h3>
-    <p class="note">持っている称号を、名前の上と下に1つずつ付けられます。称号はアカウントの成績で自動で付きます(10分ごとに更新)。</p>
-    <div class="t-preview">
-      <span class="plate-body">
-        ${top ? `<span class="plate-titles">${titleHtml(top)}</span>` : ""}
-        <span class="plate-name">${esc(who?.name || "")}</span>
-        ${bottom ? `<span class="plate-titles bottom">${titleHtml(bottom)}</span>` : ""}
-      </span>
-    </div>
-    <div class="t-tabs">
-      <button class="cr-btn${titleSlot === "top" ? " on" : ""}" data-tslot="top">上の称号</button>
-      <button class="cr-btn${titleSlot === "bottom" ? " on" : ""}" data-tslot="bottom">下の称号</button>
-    </div>
-    ${list.length ? "" : `<p class="note">まだ称号がありません。アカウントを登録すると、成績に合わせて付きます。</p>`}
-    <div class="t-choices">${choices}</div>
-    ${shapes ? `<div class="t-label">形</div>${shapes}` : ""}
-    <div style="margin-top:12px"><button class="cr-btn go gold" id="t-save">この称号で保存</button></div>
-    ${titleMsg.err ? `<p class="err">${esc(titleMsg.err)}</p>` : ""}
-    ${titleMsg.ok ? `<p class="ok">${esc(titleMsg.ok)}</p>` : ""}
-    <details style="margin-top:14px"><summary class="note" style="cursor:pointer">称号の一覧と、付く条件</summary>${catalog}</details>
-  </div>`;
-}
-
-function bindTitleBox() {
-  if (!titleEdit) return;
-  $main.querySelectorAll("[data-tslot]").forEach(b => {
-    b.onclick = () => { titleSlot = b.dataset.tslot; titleMsg = { err: "", ok: "" }; draw(); };
-  });
-  $main.querySelectorAll("[data-tc]").forEach(b => {
-    b.onclick = () => {
-      const val = b.dataset.tc;
-      const old = titleEdit[titleSlot];
-      titleEdit[titleSlot] = val === "auto" ? "auto" : val === "none" ? null
-        : { id: val, shape: (old && old !== "auto" && old.shape) || "rect" };
-      titleMsg = { err: "", ok: "" }; draw();
-    };
-  });
-  $main.querySelectorAll("[data-tsh]").forEach(b => {
-    b.onclick = () => { titleEdit[titleSlot] = { ...titleEdit[titleSlot], shape: b.dataset.tsh }; draw(); };
-  });
-  const save = document.getElementById("t-save");
-  if (save) save.onclick = async () => {
-    titleMsg = { err: "", ok: "" };
-    try {
-      const enc = (v) => v === "auto" ? "auto" : v === null ? null : { id: v.id, shape: v.shape || "rect" };
-      titleData = await api("/api/titles/equip", { top: enc(titleEdit.top), bottom: enc(titleEdit.bottom) });
-      startTitleEdit();
-      roster = await loadData("roster.json");
-      titleMsg.ok = "称号を保存しました。順位表にもすぐ出ます";
-    } catch (e) { titleMsg.err = e.message; }
-    draw();
-  };
-}
-
-// ---- 管理人: ユニーク称号を付ける ----
-function grantBox() {
-  const f = grantForm;
-  const users = adminTitles.users || [];
-  const sample = { label: f.label || "称号の文字", sub: f.sub, year: f.year, design: f.design, shape: f.shape || "rect" };
-  return `<div class="pf">
-    <h3>管理(ユニーク称号を付ける)</h3>
-    <p class="note">ここで付けた称号はレアリティ「ユニーク」になります。形を決めると、本人は形を変えられません(炎の枠はここでだけ選べます)。</p>
-    <div class="pf-grid">
-      <select id="g-user"><option value="">付ける人</option>${users.map(u =>
-        `<option value="${esc(u.id)}"${u.id === f.discordId ? " selected" : ""}>${esc(u.name || u.id)}</option>`).join("")}</select>
-      <button class="cr-btn" id="g-4000">「レート4000到達」を入れる</button>
-    </div>
-    <div class="pf-row" style="margin-top:6px"><input id="g-label" maxlength="20" placeholder="称号の文字" value="${esc(f.label)}"></div>
-    <div class="pf-grid" style="margin-top:6px">
-      <input id="g-sub" maxlength="24" placeholder="小見出し(英字など・任意)" value="${esc(f.sub)}">
-      <input id="g-year" maxlength="8" placeholder="年(任意)" value="${esc(f.year)}">
-      <select id="g-design">${Titles.DESIGNS.map(d =>
-        `<option value="${d.id}"${d.id === f.design ? " selected" : ""}>${esc(d.name)}</option>`).join("")}</select>
-      <select id="g-shape"><option value="">形: 本人が選ぶ</option>${Titles.SHAPES.map(sh =>
-        `<option value="${sh.id}"${sh.id === f.shape ? " selected" : ""}>形: ${esc(sh.name)}</option>`).join("")}</select>
-    </div>
-    <div class="title-row">${titleHtml(sample)}</div>
-    <div class="title-row">${titleHtml(sample, true)}</div>
-    <button class="cr-btn go gold" id="g-add">この称号を付ける</button>
-    <div class="t-label">付けた称号</div>
-    ${(adminTitles.grants || []).map(g => `<div class="acc">
-      <span class="acc-body"><span style="display:block;margin-bottom:4px">${titleHtml({ ...g, shape: g.shape || "rect" })}</span><small>${esc(g.userName || g.userId)} に付けた</small></span>
-      <span class="acc-btns"><button class="cr-btn" data-revoke="${esc(g.id)}">外す</button></span>
-    </div>`).join("") || `<p class="note">まだありません。</p>`}
-  </div>`;
-}
-
-function bindGrantBox() {
-  if (!adminTitles) return;
-  const $ = (id) => document.getElementById(id);
-  const sync = () => {
-    grantForm = { discordId: $("g-user").value, label: $("g-label").value, sub: $("g-sub").value,
-                  year: $("g-year").value, design: $("g-design").value, shape: $("g-shape").value };
-  };
-  ["g-user", "g-design", "g-shape"].forEach(id => { $(id).onchange = () => { sync(); draw(); }; });
-  ["g-label", "g-sub", "g-year"].forEach(id => { $(id).onchange = () => { sync(); draw(); }; });
-  $("g-4000").onclick = () => { sync(); grantForm.label = "レート4000到達"; draw(); };
-  $("g-add").onclick = async () => {
-    sync();
-    profileMsg = { err: "", ok: "" };
-    try {
-      adminTitles = await api("/api/admin/titles/grant", grantForm);
-      grantForm = { ...grantForm, label: "", sub: "", year: "" };
-      roster = await loadData("roster.json");
-      profileMsg.ok = "称号を付けました";
-    } catch (e) { profileMsg.err = e.message; }
-    draw();
-  };
-  $main.querySelectorAll("[data-revoke]").forEach(b => {
-    b.onclick = async () => {
-      if (!confirm("この称号を外しますか？")) return;
-      try { adminTitles = await api("/api/admin/titles/revoke", { id: b.dataset.revoke }); roster = await loadData("roster.json"); }
-      catch (e) { profileMsg.err = e.message; }
-      draw();
-    };
-  });
+  if (add) add.onclick = () => go("/api/admin/guests/add",
+    { id: document.getElementById("guest-id").value, name: document.getElementById("guest-name").value }, "許可しました");
 }
 
 // ---- スパーキーランキング ----

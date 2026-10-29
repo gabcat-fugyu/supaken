@@ -150,25 +150,16 @@ async function discordCallback(request, env) {
   let allowed = extra.includes(user.id)
     || !!(await env.DB.prepare("SELECT id FROM allowed_users WHERE id = ?").bind(user.id).first());
   let nick = null;
-  const ts = new Date().toISOString();
-  // 入れなかった人を残しておく(管理人が「許可する」を押せるように)
-  const denied = async (reason) => {
-    await env.DB.prepare(
-      `INSERT INTO denied_logins (id, name, avatar, reason, at) VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET name = excluded.name, avatar = excluded.avatar, reason = excluded.reason, at = excluded.at`
-    ).bind(user.id, user.global_name || user.username, user.avatar || null, reason, ts).run();
-    return back(reason);
-  };
   if (!allowed) {
     const memRes = await fetch(`${DISCORD}/users/@me/guilds/${env.DISCORD_GUILD_ID}/member`, { headers: auth });
-    if (memRes.status === 404) return denied("guild");
+    if (memRes.status === 404) return back("guild");
     if (!memRes.ok) return back("error");
     const member = await memRes.json();
     nick = member.nick;
     allowed = (member.roles || []).includes(env.DISCORD_MEMBER_ROLE_ID);
   }
-  if (!allowed) return denied("role");
-  await env.DB.prepare("DELETE FROM denied_logins WHERE id = ?").bind(user.id).run();
+  if (!allowed) return back("role");
+  const ts = new Date().toISOString();
 
   const name = nick || user.global_name || user.username;
   await env.DB.prepare(
@@ -395,23 +386,20 @@ async function adminTitles(env) {
 
 // ---- メン限ロールが無くても入れる人 ----
 async function adminGuests(env) {
-  const allowed = (await env.DB.prepare("SELECT * FROM allowed_users ORDER BY added_at DESC").all()).results || [];
-  const denied = (await env.DB.prepare(
-    "SELECT * FROM denied_logins WHERE id NOT IN (SELECT id FROM allowed_users) ORDER BY at DESC LIMIT 30"
+  // 一度でもログインしていれば Discord の名前(表示名)を出す
+  const allowed = (await env.DB.prepare(
+    `SELECT a.id, a.name AS memo, a.added_at, COALESCE(p.display_name, u.name) AS name, u.last_login
+     FROM allowed_users a LEFT JOIN discord_users u ON u.id = a.id LEFT JOIN profiles p ON p.discord_id = a.id
+     ORDER BY a.added_at DESC`
   ).all()).results || [];
-  const av = (r) => r.avatar ? `https://cdn.discordapp.com/avatars/${r.id}/${r.avatar}.png?size=64` : null;
-  return json({
-    allowed: allowed.map((r) => ({ id: r.id, name: r.name, at: r.added_at })),
-    denied: denied.map((r) => ({ id: r.id, name: r.name, avatar: av(r), reason: r.reason, at: r.at })),
-  });
+  return json({ allowed: allowed.map((r) => ({ id: r.id, name: r.name, memo: r.memo, at: r.added_at, lastLogin: r.last_login })) });
 }
 
 async function adminGuestAdd(request, env) {
   const b = await readBody(request);
   const gid = String(b.id || "").trim();
   if (!/^\d{15,21}$/.test(gid)) return fail(400, "Discord のユーザーID(数字)を入れてください");
-  const known = await env.DB.prepare("SELECT name FROM denied_logins WHERE id = ?").bind(gid).first();
-  const name = String(b.name || "").trim().slice(0, 32) || (known && known.name) || null;
+  const name = String(b.name || "").trim().slice(0, 32) || null;     // 覚え書き(誰か分かるように)
   await env.DB.prepare(
     `INSERT INTO allowed_users (id, name, added_at) VALUES (?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET name = COALESCE(excluded.name, allowed_users.name)`
