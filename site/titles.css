@@ -290,13 +290,34 @@
 .bz .bz-l { left: 0; width: calc(var(--s) * 293); background-image: url(/assets/skins/blaze-left.webp); }
 .bz .bz-m { left: calc(var(--s) * 293 - 1px); right: calc(var(--s) * 508 - 1px); background-image: url(/assets/skins/blaze-mid.webp); }
 .bz .bz-r { right: 0; width: calc(var(--s) * 508); background-image: url(/assets/skins/blaze-right.webp); }
-/* 炎のうしろの光(動かさない) */
+/* 炎のうしろの光 */
 .bz .bz-g { right: calc(var(--s) * 40); width: calc(var(--s) * 330); z-index: -2;
-            background: radial-gradient(closest-side, color-mix(in srgb, var(--bz-glow) 55%, transparent), transparent); }
+            background: radial-gradient(closest-side, color-mix(in srgb, var(--bz-glow) 55%, transparent), transparent);
+            animation: bz-glow 1.6s ease-in-out infinite; }
+/* 舞い上がる火の粉 */
+.bz .bz-e { right: calc(var(--s) * 60); width: calc(var(--s) * 300); z-index: 1;
+            background:
+              radial-gradient(circle, #fff 0 1px, transparent 1.6px) 20% 70% / 30% 40% no-repeat,
+              radial-gradient(circle, #f0d8ff 0 1.2px, transparent 2px) 60% 60% / 30% 40% no-repeat,
+              radial-gradient(circle, #e2b8ff 0 0.9px, transparent 1.5px) 85% 75% / 30% 40% no-repeat;
+            animation: bz-ember 2.4s linear infinite; }
+.bz .bz-e2 { animation-delay: -1.2s; right: calc(var(--s) * 120); }
+/* 棒の上を走る光 */
+.bz .bz-sh { top: 0; height: 100%; left: calc(var(--s) * 90); right: calc(var(--s) * 300); z-index: 0; overflow: hidden;
+             background: linear-gradient(100deg, transparent 40%, rgba(255,255,255,0.28) 50%, transparent 60%) no-repeat;
+             background-size: 50% 100%; animation: bz-sheen 4.5s ease-in-out infinite; }
 .bz-text { position: relative; z-index: 1; display: inline-flex; flex-direction: column; justify-content: center; gap: 3px; }
 .bz b { font-weight: normal; color: #fff;
         text-shadow: 0 0 4px var(--bz-glow), 0 0 8px var(--bz-glow), 0 1px 0 rgba(0,0,0,0.8); }
 .bz .ttl-sub { display: none; }
+@keyframes bz-glow { 0%, 100% { opacity: 0.7; } 40% { opacity: 1; } }
+@keyframes bz-ember {
+  0%   { transform: translate(0, 10%); opacity: 0; }
+  20%  { opacity: 1; }
+  100% { transform: translate(8%, -45%); opacity: 0; }
+}
+@keyframes bz-sheen { 0%, 55% { background-position: -60% 0; } 100% { background-position: 220% 0; } }
+
 /* 大きい札(プレイヤーページ) */
 .bz.big { --h: 40px; font-size: 15px; }
 .bz.big .ttl-sub { display: block; font-size: 8.5px; letter-spacing: 0.22em; color: #eadcff;
