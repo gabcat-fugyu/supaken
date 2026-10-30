@@ -68,6 +68,40 @@
   }
   .copy svg { width: 10px; height: 10px; fill: currentColor; }
   .head-btns { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .rail .sep { flex: 0 0 6px; }
+  /* カード別 */
+  .crow {
+    display: flex; align-items: center; gap: 10px; width: 100%; margin-bottom: 7px; padding: 8px 10px; cursor: pointer;
+    font: inherit; color: var(--ink); text-align: left; border-radius: 14px;
+    background: linear-gradient(180deg, rgba(35,79,163,0.92), rgba(16,44,102,0.92)); border: 2px solid rgba(96,150,235,0.5);
+  }
+  .rank.sm { width: 28px; height: 28px; font-size: 12px; }
+  .cimg { width: 44px; height: 53px; flex-shrink: 0; overflow: hidden; }
+  .cimg img { width: 100%; height: 100%; object-fit: contain; }
+  .cbody { flex: 1; min-width: 0; }
+  .cbody b { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cbody small { display: block; font-size: 10px; color: var(--ink-dim); margin-top: 3px; }
+  .bar { display: block; height: 5px; margin-top: 4px; border-radius: 3px; background: rgba(6,16,40,0.6); overflow: hidden; }
+  .bar span { display: block; height: 100%; background: linear-gradient(90deg, var(--gold-deep), var(--gold)); }
+  .cwin { flex-shrink: 0; text-align: center; min-width: 54px; }
+  .cwin b { display: block; font-family: 'Mochiy Pop One', sans-serif; font-weight: 400; font-size: 15px; color: #8fd6ff; }
+  .cwin b u { text-decoration: none; font-size: 9px; }
+  .cwin small { font-size: 9px; color: var(--ink-dim); }
+  /* カードで絞る */
+  .filter { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
+  .cr-btn.small { font-size: 11px; padding: 5px 10px; border-bottom-width: 3px; }
+  .fchip {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 2px; border-radius: 999px; cursor: pointer;
+    font: inherit; font-size: 11px; font-weight: 800; color: #3d2600; background: linear-gradient(180deg, var(--gold-lite), var(--gold));
+    border: 1px solid var(--gold-deep);
+  }
+  .fchip img { width: 22px; height: 26px; object-fit: contain; }
+  .fcount { font-size: 11px; color: var(--ink-dim); }
+  .picker { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; margin-bottom: 12px; padding: 8px; border-radius: 12px;
+            background: rgba(6,16,40,0.55); max-height: 300px; overflow-y: auto; }
+  .pick { min-width: 0; overflow: hidden; padding: 0; border: 2px solid transparent; border-radius: 8px; background: none; cursor: pointer; aspect-ratio: 5 / 6; }
+  .pick img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .pick.on { border-color: var(--gold); background: rgba(255,210,63,0.2); }
   .notice { text-align: center; padding: 46px 18px; color: var(--ink-dim); font-size: 13px; line-height: 1.9; }
   .more { display: block; width: 100%; margin: 4px 0 10px; }
 </style>
@@ -93,9 +127,17 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
 const DROP = `<svg viewBox="0 0 10 13" aria-hidden="true"><path d="M5 0C5 0 0 5.6 0 8.6A5 5 0 0 0 10 8.6C10 5.6 5 0 5 0z"/></svg>`;
 const COPY_ICON = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1h8a2 2 0 0 1 2 2v8h-2V3H5zM1 5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2z"/></svg>`;
 const T = I18N.t;
+// 勝率順に並べるときの、最低限の試合数(少なすぎる試合の勝率は当てにならないので)
+const MIN_DECK_BATTLES = 20, MIN_CARD_BATTLES = 50;
 const SORTS = [
   { id: "use", label: () => T("使用率順", "By usage") },
-  { id: "win", label: () => T("勝率順(20試合以上)", "By win rate (20+ battles)") },
+  { id: "win", label: () => view === "cards"
+      ? T(`勝率順(${MIN_CARD_BATTLES}試合以上)`, `By win rate (${MIN_CARD_BATTLES}+ battles)`)
+      : T(`勝率順(${MIN_DECK_BATTLES}試合以上)`, `By win rate (${MIN_DECK_BATTLES}+ battles)`) },
+];
+const VIEWS = [
+  { id: "decks", label: () => T("デッキ", "Decks") },
+  { id: "cards", label: () => T("カード", "Cards") },
 ];
 // ランキングの名前(データには日本語で入っている)
 const BOARD_NAMES = { world100: ["世界TOP100", "Global Top 100"], world1000: ["世界TOP1000", "Global Top 1000"], jp1000: ["日本TOP1000", "Japan Top 1000"] };
@@ -103,6 +145,9 @@ const boardName = (b) => BOARD_NAMES[b.key] ? T(...BOARD_NAMES[b.key]) : b.label
 const PAGE = 20;
 
 let data = null, failed = false, boardKey = "world1000", sortId = "use", shown = PAGE;
+let view = "decks";            // デッキ / カード
+let filter = [];               // このカードが入っているデッキだけ(カードID。複数なら全部入り)
+let picking = false;           // カードを選ぶ一覧を開いているか
 
 async function loadJson(path) {
   // raw配信はキャッシュが効くので、まずキャッシュを挟まない GitHub API 経由で読む
@@ -143,62 +188,119 @@ function slot([id, ev], i) {
     kind ? `<span class="tag">${kind === "evo" ? T("進化", "Evo") : T("ヒーロー", "Hero")}</span>` : ""}</div>`;
 }
 
+function cardImg(id, kind) {
+  const c = card(id);
+  const url = (kind === "evo" && c.i?.evolutionMedium) || (kind === "hero" && c.i?.heroMedium) || c.i?.medium || "";
+  return url ? `<img src="${esc(url)}" alt="${esc(c.n || "")}" loading="lazy">` : "";
+}
+
+function deckRow(d, i, b) {
+  const use = b.players ? d.players / b.players * 100 : 0;
+  const wr = winRate(d);
+  const costs = d.cards.map(([id]) => card(id).e).filter(v => typeof v === "number");
+  const avg = costs.length ? (costs.reduce((a, c) => a + c, 0) / costs.length).toFixed(1) : null;
+  const tower = d.tower ? card(d.tower) : null;
+  const copy = copyUrl(d);
+  return `<div class="deck${i === 0 ? " top1" : ""}">
+    <div class="deck-head">
+      <span class="rank${i < 3 ? " g" + (i + 1) : ""}">${i + 1}</span>
+      <span class="stats">
+        <span class="stat"><b>${use.toFixed(1)}<u>%</u></b><small>${T(`使用率(${d.players}人)`, `Usage (${d.players} players)`)}</small></span>
+        <span class="stat"><b>${d.battles}<u>${T("戦", "")}</u></b><small>${T("使われた試合", "Battles")}</small></span>
+        <span class="stat win"><b>${wr == null ? "—" : wr.toFixed(1) + "<u>%</u>"}</b><small>${T("勝率", "Win rate")}</small></span>
+      </span>
+    </div>
+    <div class="grid">${d.cards.map(slot).join("")}</div>
+    <div class="deck-foot">
+      ${tower?.i?.medium ? `<img class="tower" src="${esc(tower.i.medium)}" alt="${esc(tower.n || "")}" title="${esc(tower.n || "")}">` : ""}
+      ${avg ? `<span class="avg">${DROP} ${T("平均", "Avg")} ${avg}</span>` : ""}
+      ${copy ? `<a class="copy" href="${esc(copy)}" target="_blank" rel="noopener">${COPY_ICON}${T("コピー", "Copy")}</a>` : ""}
+    </div>
+  </div>`;
+}
+
+function cardRow(c, i, b) {
+  const use = b.players ? c.players / b.players * 100 : 0;
+  const wr = winRate(c);
+  const info = card(c.id);
+  const evo = c.players ? c.evo / c.players * 100 : 0, hero = c.players ? c.hero / c.players * 100 : 0;
+  return `<button class="crow" data-card="${c.id}">
+    <span class="rank sm${i < 3 ? " g" + (i + 1) : ""}">${i + 1}</span>
+    <span class="cimg">${cardImg(c.id)}</span>
+    <span class="cbody">
+      <b>${esc(info.n || c.id)}</b>
+      <span class="bar"><span style="width:${Math.min(100, use)}%"></span></span>
+      <small>${T(`使用率 ${use.toFixed(1)}%(${c.players}人)`, `Usage ${use.toFixed(1)}% (${c.players})`)}${
+        evo >= 1 ? ` · ${T("進化", "Evo")} ${evo.toFixed(0)}%` : ""}${hero >= 1 ? ` · ${T("ヒーロー", "Hero")} ${hero.toFixed(0)}%` : ""}</small>
+    </span>
+    <span class="cwin"><b>${wr == null ? "—" : wr.toFixed(1) + "<u>%</u>"}</b><small>${T("勝率", "Win rate")}</small></span>
+  </button>`;
+}
+
 function render() {
   if (failed) { $main.innerHTML = `<div class="notice">${T("まだ集計されていません。<br>しばらくしてから開き直してください。", "No data yet.<br>Please check back a little later.")}</div>`; return; }
   if (!data) { $main.innerHTML = `<div class="notice">${T("読み込み中…", "Loading…")}</div>`; return; }
   const boards = data.boards || [];
   const b = boards.find(x => x.key === boardKey) || boards[0];
   if (!b) { $main.innerHTML = `<div class="notice">${T("集計結果がありません。", "No results.")}</div>`; return; }
+  const cardStats = b.cards || [];
 
-  // 使用率は「使っている人の割合」。1人が何試合使っても1人と数える
-  let list = [...(b.decks || [])].sort((x, y) => (y.players - x.players) || (y.battles - x.battles));
-  if (sortId === "win") {
-    list = list.filter(d => d.wins + d.losses >= 20).sort((x, y) => winRate(y) - winRate(x));
+  let body = "", total = 0;
+  if (view === "cards") {
+    let list = [...cardStats];
+    if (sortId === "win") list = list.filter(c => c.battles >= MIN_CARD_BATTLES).sort((x, y) => winRate(y) - winRate(x));
+    total = list.length;
+    body = cardStats.length
+      ? `<p class="summary">${T("カードを押すと、そのカードが入っているデッキが見られます。",
+          "Tap a card to see decks that use it.")}</p>${list.slice(0, shown).map((c, i) => cardRow(c, i, b)).join("")}`
+      : `<div class="notice">${T("カード別の集計は次の更新(30分以内)から出ます。", "Card stats will appear after the next update (within 30 min).")}</div>`;
+  } else {
+    // 使用率は「使っている人の割合」。1人が何試合使っても1人と数える
+    let list = [...(b.decks || [])].sort((x, y) => (y.players - x.players) || (y.battles - x.battles));
+    if (filter.length) list = list.filter(d => filter.every(id => d.cards.some(([cid]) => cid === id)));
+    if (sortId === "win") list = list.filter(d => d.wins + d.losses >= MIN_DECK_BATTLES).sort((x, y) => winRate(y) - winRate(x));
+    total = list.length;
+    const chips = filter.map(id => `<button class="fchip" data-unfilter="${id}">${cardImg(id)}<span>${esc(card(id).n || id)}</span>×</button>`).join("");
+    const picker = picking ? `<div class="picker">${(cardStats.length ? cardStats.map(c => c.id) : Object.keys(data.cards || {}).map(Number))
+      .map(id => `<button class="pick${filter.includes(id) ? " on" : ""}" data-pick="${id}" title="${esc(card(id).n || "")}">${cardImg(id)}</button>`).join("")}</div>` : "";
+    body = `<div class="filter">
+        <button class="cr-btn small" id="pick-toggle">${picking ? T("閉じる", "Close") : T("＋ カードで絞る", "+ Filter by card")}</button>
+        ${chips}${filter.length ? `<span class="fcount">${T(`${total}個`, `${total} decks`)}</span>` : ""}
+      </div>
+      ${picker}
+      ${list.slice(0, shown).map((d, i) => deckRow(d, i, b)).join("") ||
+        `<div class="notice">${filter.length ? T("このカードが入ったデッキは見つかりませんでした。", "No decks with these cards.") : T("まだデータがありません。", "No data yet.")}</div>`}`;
   }
-
-  const rows = list.slice(0, shown).map((d, i) => {
-    const use = b.players ? d.players / b.players * 100 : 0;
-    const wr = winRate(d);
-    const costs = d.cards.map(([id]) => card(id).e).filter(v => typeof v === "number");
-    const avg = costs.length ? (costs.reduce((a, c) => a + c, 0) / costs.length).toFixed(1) : null;
-    const tower = d.tower ? card(d.tower) : null;
-    const copy = copyUrl(d);
-    return `<div class="deck${i === 0 ? " top1" : ""}">
-      <div class="deck-head">
-        <span class="rank${i < 3 ? " g" + (i + 1) : ""}">${i + 1}</span>
-        <span class="stats">
-          <span class="stat"><b>${use.toFixed(1)}<u>%</u></b><small>${T(`使用率(${d.players}人)`, `Usage (${d.players} players)`)}</small></span>
-          <span class="stat"><b>${d.battles}<u>${T("戦", "")}</u></b><small>${T("使われた試合", "Battles")}</small></span>
-          <span class="stat win"><b>${wr == null ? "—" : wr.toFixed(1) + "<u>%</u>"}</b><small>${T("勝率", "Win rate")}</small></span>
-        </span>
-      </div>
-      <div class="grid">${d.cards.map(slot).join("")}</div>
-      <div class="deck-foot">
-        ${tower?.i?.medium ? `<img class="tower" src="${esc(tower.i.medium)}" alt="${esc(tower.n || "")}" title="${esc(tower.n || "")}">` : ""}
-        ${avg ? `<span class="avg">${DROP} ${T("平均", "Avg")} ${avg}</span>` : ""}
-        ${copy ? `<a class="copy" href="${esc(copy)}" target="_blank" rel="noopener">${COPY_ICON}${T("コピー", "Copy")}</a>` : ""}
-      </div>
-    </div>`;
-  }).join("");
 
   $main.innerHTML = `
     <div class="rail">${boards.map(x =>
       `<button class="cr-btn${x.key === b.key ? " on" : ""}" data-board="${esc(x.key)}">${esc(boardName(x))}</button>`).join("")}</div>
-    <div class="rail sub">${SORTS.map(s =>
+    <div class="rail sub">${VIEWS.map(v =>
+      `<button class="cr-btn${v.id === view ? " on" : ""}" data-view="${v.id}">${esc(v.label())}</button>`).join("")}
+      <span class="sep"></span>${SORTS.map(s =>
       `<button class="cr-btn${s.id === sortId ? " on" : ""}" data-sort="${s.id}">${esc(s.label())}</button>`).join("")}</div>
-    <p class="summary">${T(`${esc(boardName(b))}のうち、直近${esc(data.days || 7)}日に天界で対戦した<b>${b.players}人</b>(<b>${b.battles}試合</b>)のデッキを数えています。
-      使用率は「そのデッキを使った人の割合」です(1人が何試合使っても1人)。進化・ヒーローの付け方が違えば別のデッキとして数えます。`,
-      `Decks used by <b>${b.players} players</b> from the ${esc(boardName(b))} in Ultimate Champion over the last ${esc(data.days || 7)} days (<b>${b.battles} battles</b>).
-      Usage is the share of players who used the deck (each player counts once). Different Evo / Hero choices count as different decks.`)}${
+    <p class="summary">${T(`${esc(boardName(b))}のうち、直近${esc(data.days || 7)}日に天界で対戦した<b>${b.players}人</b>(<b>${b.battles}試合</b>)を数えています。
+      使用率は「使った人の割合」です(1人が何試合使っても1人)。進化・ヒーローの付け方が違えば別のデッキとして数えます。`,
+      `Based on <b>${b.players} players</b> from the ${esc(boardName(b))} in Ultimate Champion over the last ${esc(data.days || 7)} days (<b>${b.battles} battles</b>).
+      Usage is the share of players who used it (each player counts once). Different Evo / Hero choices count as different decks.`)}${
       b.stale ? T("<br>※今回は集計できなかったので、前回の結果です。", "<br>* Couldn't update this time; showing the previous results.") : ""}
       ${data.updatedAt ? `<br>${T("更新", "Updated")} ${esc(ago(data.updatedAt))}` : ""}</p>
-    ${rows || `<div class="notice">${T("まだデータがありません。", "No data yet.")}</div>`}
-    ${shown < list.length ? `<button class="cr-btn more" id="more">${T(`さらに${Math.min(PAGE, list.length - shown)}個`, `Show ${Math.min(PAGE, list.length - shown)} more`)}</button>` : ""}`;
+    ${body}
+    ${shown < total ? `<button class="cr-btn more" id="more">${T(`さらに${Math.min(PAGE, total - shown)}個`, `Show ${Math.min(PAGE, total - shown)} more`)}</button>` : ""}`;
 
-  $main.querySelectorAll("[data-board]").forEach(el => { el.onclick = () => { boardKey = el.dataset.board; shown = PAGE; render(); }; });
-  $main.querySelectorAll("[data-sort]").forEach(el => { el.onclick = () => { sortId = el.dataset.sort; shown = PAGE; render(); }; });
-  const more = document.getElementById("more");
-  if (more) more.onclick = () => { shown += PAGE; render(); };
+  const on = (sel, fn) => $main.querySelectorAll(sel).forEach(el => { el.onclick = () => fn(el); });
+  on("[data-board]", el => { boardKey = el.dataset.board; shown = PAGE; render(); });
+  on("[data-view]", el => { view = el.dataset.view; shown = PAGE; picking = false; render(); });
+  on("[data-sort]", el => { sortId = el.dataset.sort; shown = PAGE; render(); });
+  on("[data-card]", el => { view = "decks"; filter = [Number(el.dataset.card)]; sortId = "use"; shown = PAGE; picking = false; render(); window.scrollTo(0, 0); });
+  on("[data-unfilter]", el => { filter = filter.filter(id => id !== Number(el.dataset.unfilter)); shown = PAGE; render(); });
+  on("[data-pick]", el => {
+    const id = Number(el.dataset.pick);
+    filter = filter.includes(id) ? filter.filter(x => x !== id) : [...filter, id];
+    shown = PAGE; render();
+  });
+  on("#pick-toggle", () => { picking = !picking; render(); });
+  on("#more", () => { shown += PAGE; render(); });
 }
 
 async function load() {
