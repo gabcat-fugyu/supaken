@@ -97,10 +97,12 @@
   }
   .fchip img { width: 22px; height: 26px; object-fit: contain; }
   .fcount { font-size: 11px; color: var(--ink-dim); }
-  .picker { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; margin-bottom: 12px; padding: 8px; border-radius: 12px;
-            background: rgba(6,16,40,0.55); max-height: 300px; overflow-y: auto; }
-  .pick { min-width: 0; overflow: hidden; padding: 0; border: 2px solid transparent; border-radius: 8px; background: none; cursor: pointer; aspect-ratio: 5 / 6; }
-  .pick img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .picker { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; padding: 10px;
+            border-radius: 12px; background: rgba(6,16,40,0.55); max-height: 360px; overflow-y: auto; }
+  /* iPhone の Safari はボタンの aspect-ratio が効かないことがあるので、上の余白で縦横比を作る */
+  .pick { position: relative; display: block; width: 100%; min-width: 0; height: 0; padding: 120% 0 0; overflow: hidden;
+          border: 2px solid transparent; border-radius: 8px; background: none; cursor: pointer; }
+  .pick img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
   .pick.on { border-color: var(--gold); background: rgba(255,210,63,0.2); }
   .notice { text-align: center; padding: 46px 18px; color: var(--ink-dim); font-size: 13px; line-height: 1.9; }
   .more { display: block; width: 100%; margin: 4px 0 10px; }
@@ -261,7 +263,7 @@ function render() {
     if (sortId === "win") list = list.filter(d => d.wins + d.losses >= MIN_DECK_BATTLES).sort((x, y) => winRate(y) - winRate(x));
     total = list.length;
     const chips = filter.map(id => `<button class="fchip" data-unfilter="${id}">${cardImg(id)}<span>${esc(card(id).n || id)}</span>×</button>`).join("");
-    const picker = picking ? `<div class="picker">${(cardStats.length ? cardStats.map(c => c.id) : Object.keys(data.cards || {}).map(Number))
+    const picker = picking ? `<div class="picker">${(cardStats.length ? cardStats.map(c => c.id) : Object.keys(data.cards || {}).map(Number)).filter(id => id < 159000000)
       .map(id => `<button class="pick${filter.includes(id) ? " on" : ""}" data-pick="${id}" title="${esc(card(id).n || "")}">${cardImg(id)}</button>`).join("")}</div>` : "";
     body = `<div class="filter">
         <button class="cr-btn small" id="pick-toggle">${picking ? T("閉じる", "Close") : T("＋ カードで絞る", "+ Filter by card")}</button>
