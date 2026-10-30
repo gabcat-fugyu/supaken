@@ -29,6 +29,8 @@ ADMIN_DISCORD_IDS = "757372889136889906"
 # Discord でログインするときの判定。このサーバーでこのロールを持っている人がメン限ページに入れる
 DISCORD_GUILD_ID = "1418622264542236697"
 DISCORD_MEMBER_ROLE_ID = "1525382489558745209"
+# グループランキング(Google ログイン)の管理人の利用者ID(カンマ区切り)。ユニーク称号を付けられる
+ADMIN_APP_IDS = "01f930a58d537f0a"
 
 [[routes]]
 pattern = "supaken.com"
