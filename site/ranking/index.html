@@ -101,6 +101,7 @@
 </div>
 <button id="refresh" class="refresh" aria-label="更新">⟳</button>
 <script src="/i18n.js"></script>
+<script src="/card-cats.js"></script>
 <script>
 // 使い手ランキング。日本・世界の上位(各1000人)のうち、そのカードを直近の試合の半分以上で使っている人を
 // レートの高い順に並べる。集計は Sparkylab(data/users.json)。カードはどれでも選べる(最初はスパーキー)
@@ -114,22 +115,13 @@ const COPY_ICON = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1h8a2
 const SPARKY = 26000033;
 const PAGE = 30;
 
-// カードの分け方。主軸はメン限ページの「よく当たるデッキ」と同じ一覧+ガーゴイルジャイアント
-const WIN_CONDITIONS = new Set([
-  "Hog Rider", "Royal Giant", "Giant", "Golem", "Lava Hound", "Balloon",
-  "X-Bow", "Mortar", "Graveyard", "Miner", "Goblin Barrel", "Ram Rider",
-  "Battle Ram", "Royal Hogs", "Elixir Golem", "Electro Giant", "Goblin Giant",
-  "Giant Skeleton", "Three Musketeers", "Sparky", "Wall Breakers",
-  "Skeleton Barrel", "Goblin Drill", "Mega Knight", "P.E.K.K.A",
-  "Royal Recruits", "Rocket", "Minion Giant",
-]);
+// カードの分け方(主軸 / スペル / その他)は card-cats.js
 const CATS = [
   { id: "win", label: () => T("主軸", "Win conditions") },
   { id: "spell", label: () => T("スペル", "Spells") },
   { id: "other", label: () => T("その他", "Others") },
 ];
-const isSpell = (id) => String(id).startsWith("28");
-const catOf = (id) => WIN_CONDITIONS.has(card(id).n) ? "win" : isSpell(id) ? "spell" : "other";
+const catOf = (id) => CardCats.cat(id, card(id).n);
 
 let data = null, failed = false, region = "jp", cardId = SPARKY, cat = "win", picking = false, shown = PAGE;
 const opened = new Set();
@@ -214,7 +206,8 @@ function render() {
 
   // 選ぶ一覧: 分類ごとに、使い手の多い順。使い手がいないカードも薄く出す
   const ids = Object.keys(data.cards || {}).map(Number).filter(id => catOf(id) === cat)
-    .sort((a, b) => (counts[b] || 0) - (counts[a] || 0));
+    .sort((a, b) => ((counts[b] || 0) - (counts[a] || 0)) || (CardCats.rarityRank(card(a).r) - CardCats.rarityRank(card(b).r))
+      || ((card(a).e ?? 99) - (card(b).e ?? 99)));
   const catCount = (c) => Object.keys(data.cards || {}).map(Number).filter(id => catOf(id) === c && counts[id]).length;
   const picker = picking ? `
     <div class="rail sub">${CATS.map(c =>

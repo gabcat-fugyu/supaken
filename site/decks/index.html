@@ -104,6 +104,9 @@
           border: 2px solid transparent; border-radius: 8px; background: none; cursor: pointer; }
   .pick img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
   .pick.on { border-color: var(--gold); background: rgba(255,210,63,0.2); }
+  .pick .pex { position: absolute; left: 2px; top: 2px; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 8px;
+               font-size: 9.5px; font-weight: 800; line-height: 15px; text-align: center; color: #fff;
+               background: radial-gradient(circle at 40% 35%, #f08cff, var(--elixir) 60%, #7a1d8a); }
   .notice { text-align: center; padding: 46px 18px; color: var(--ink-dim); font-size: 13px; line-height: 1.9; }
   .more { display: block; width: 100%; margin: 4px 0 10px; }
 </style>
@@ -119,6 +122,7 @@
 </div>
 <button id="refresh" class="refresh" aria-label="更新">⟳</button>
 <script src="/i18n.js"></script>
+<script src="/card-cats.js"></script>
 <script>
 // 天界デッキランキング。集計は Sparkylab リポジトリ(スパーキーランキングと同じ集計のついで)。
 // 上位の人の対戦ログから、天界(リーグ7)の試合で使ったデッキを数えている。
@@ -150,6 +154,24 @@ let data = null, failed = false, boardKey = "world1000", sortId = "use", shown =
 let view = "decks";            // デッキ / カード
 let filter = [];               // このカードが入っているデッキだけ(カードID。複数なら全部入り)
 let picking = false;           // カードを選ぶ一覧を開いているか
+let pickCat = "all", pickSort = "rarity";   // カード選びの分類と並べ方
+const PICK_CATS = [
+  { id: "all", label: () => T("全部", "All") }, { id: "win", label: () => T("主軸", "Win conditions") },
+  { id: "spell", label: () => T("スペル", "Spells") }, { id: "other", label: () => T("その他", "Others") },
+];
+const PICK_SORTS = [
+  { id: "rarity", label: () => T("レアリティ順", "By rarity") }, { id: "elixir", label: () => T("エリクサー順", "By elixir") },
+];
+// 選べるカード(タワーは除く)。全カードの一覧が無い古いデータでは、出てきたカードだけ
+function pickIds() {
+  const ids = Object.keys(data.cards || {}).map(Number).filter(id => !CardCats.isTower(id))
+    .filter(id => pickCat === "all" || CardCats.cat(id, card(id).n) === pickCat);
+  const rr = (id) => CardCats.rarityRank(card(id).r), ex = (id) => card(id).e ?? 99;
+  const name = (id) => card(id).n || "";
+  return ids.sort(pickSort === "elixir"
+    ? (a, b) => (ex(a) - ex(b)) || (rr(a) - rr(b)) || name(a).localeCompare(name(b))
+    : (a, b) => (rr(a) - rr(b)) || (ex(a) - ex(b)) || name(a).localeCompare(name(b)));
+}
 
 async function loadJson(path) {
   // raw配信はキャッシュが効くので、まずキャッシュを挟まない GitHub API 経由で読む
@@ -263,8 +285,13 @@ function render() {
     if (sortId === "win") list = list.filter(d => d.wins + d.losses >= MIN_DECK_BATTLES).sort((x, y) => winRate(y) - winRate(x));
     total = list.length;
     const chips = filter.map(id => `<button class="fchip" data-unfilter="${id}">${cardImg(id)}<span>${esc(card(id).n || id)}</span>×</button>`).join("");
-    const picker = picking ? `<div class="picker">${(cardStats.length ? cardStats.map(c => c.id) : Object.keys(data.cards || {}).map(Number)).filter(id => id < 159000000)
-      .map(id => `<button class="pick${filter.includes(id) ? " on" : ""}" data-pick="${id}" title="${esc(card(id).n || "")}">${cardImg(id)}</button>`).join("")}</div>` : "";
+    const picker = picking ? `
+      <div class="rail sub">${PICK_CATS.map(c =>
+        `<button class="cr-btn${c.id === pickCat ? " on" : ""}" data-pcat="${c.id}">${esc(c.label())}</button>`).join("")}</div>
+      <div class="rail sub">${PICK_SORTS.map(o => `<button class="cr-btn${o.id === pickSort ? " on" : ""}" data-psort="${o.id}">${esc(o.label())}</button>`).join("")}</div>
+      <div class="picker">${pickIds().map(id => `<button class="pick${filter.includes(id) ? " on" : ""}" data-pick="${id}" title="${esc(card(id).n || "")}">${
+        cardImg(id)}${card(id).e != null ? `<span class="pex">${card(id).e}</span>` : ""}</button>`).join("")}</div>
+      <p class="summary">${T(`${pickIds().length}枚`, `${pickIds().length} cards`)}</p>` : "";
     body = `<div class="filter">
         <button class="cr-btn small" id="pick-toggle">${picking ? T("閉じる", "Close") : T("＋ カードで絞る", "+ Filter by card")}</button>
         ${chips}${filter.length ? `<span class="fcount">${T(`${total}個`, `${total} decks`)}</span>` : ""}
@@ -302,6 +329,8 @@ function render() {
     shown = PAGE; render();
   });
   on("#pick-toggle", () => { picking = !picking; render(); });
+  on("[data-pcat]", el => { pickCat = el.dataset.pcat; render(); });
+  on("[data-psort]", el => { pickSort = el.dataset.psort; render(); });
   on("#more", () => { shown += PAGE; render(); });
 }
 
