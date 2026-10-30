@@ -26,6 +26,26 @@
   .search .go { color: #3d2600; text-shadow: none; background: linear-gradient(180deg, var(--gold-lite), var(--gold)); border-color: var(--gold-deep); }
   .hint { font-size: 11px; color: var(--ink-dim); margin: 8px 2px 0; line-height: 1.6; }
   .recent { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  /* お気に入り */
+  .favs { margin-top: 12px; }
+  .favs-title { font-size: 11px; font-weight: 800; color: var(--gold-lite); margin: 0 2px 6px; }
+  .fav-list { display: grid; gap: 6px; }
+  .fav {
+    display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border-radius: 12px; cursor: pointer;
+    font: inherit; color: var(--ink); text-align: left;
+    background: rgba(20,55,125,0.7); border: 1px solid rgba(255,210,63,0.45);
+  }
+  .fav img { width: 30px; height: 30px; object-fit: contain; flex-shrink: 0; }
+  .fav-body { flex: 1; min-width: 0; }
+  .fav-body b { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fav-body small { display: block; font-size: 10px; color: var(--ink-dim); margin-top: 1px; }
+  .fav-val { font-family: 'Mochiy Pop One', sans-serif; font-size: 15px; color: var(--gold); flex-shrink: 0; }
+  .fav-val small { font-family: 'M PLUS Rounded 1c', sans-serif; font-size: 9px; color: var(--ink-dim); display: block; text-align: right; }
+  .star {
+    position: absolute; right: 10px; top: 10px; font: inherit; font-size: 11px; font-weight: 800; cursor: pointer;
+    padding: 5px 9px; border-radius: 999px; color: var(--ink); background: rgba(6,16,40,0.6); border: 1px solid rgba(120,170,240,0.5);
+  }
+  .star.on { color: #3d2600; background: linear-gradient(180deg, var(--gold-lite), var(--gold)); border-color: var(--gold-deep); }
   .chip {
     display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12px; font-weight: 800;
     color: var(--ink); padding: 5px 6px 5px 10px; border-radius: 999px; cursor: pointer;
@@ -41,7 +61,7 @@
     background: linear-gradient(180deg, rgba(44,94,190,0.95), rgba(13,40,96,0.95));
     border: 3px solid var(--gold-deep); border-radius: 18px;
   }
-  .b-name { font-family: 'Mochiy Pop One', sans-serif; font-size: 20px; word-break: break-all; }
+  .b-name { font-family: 'Mochiy Pop One', sans-serif; font-size: 20px; word-break: break-all; margin-top: 18px; }
   .b-tag { font-size: 11px; color: var(--ink-dim); margin-top: 2px; }
   .b-clan { font-size: 12px; color: var(--gold-lite); margin-top: 4px; }
   .b-shield { width: 72px; height: 72px; object-fit: contain; display: block; margin: 10px auto 2px; }
@@ -126,6 +146,7 @@
     <button class="cr-btn go" type="submit">検索</button>
   </form>
   <p class="hint">タグは、クラロワのプロフィールで名前の下にある「#」から始まる英数字です。名前では探せません。</p>
+  <div class="favs" id="favs"></div>
   <div class="recent" id="recent"></div>
   <div id="main"></div>
   <p class="fine">This material is unofficial and is not endorsed by Supercell.<br>For more information see Supercell's Fan Content Policy: www.supercell.com/fan-content-policy.</p>
@@ -165,13 +186,49 @@ function writeRecent(list) {
   try { localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, 12))); } catch {}
 }
 function drawRecent() {
-  const list = readRecent();
+  const favs = new Set(readFavs().map(x => x.tag));
+  const list = readRecent().filter(x => !favs.has(x.tag));
   $("recent").innerHTML = list.map(x => `<span class="chip" data-tag="${esc(x.tag)}">${esc(x.name || "#" + x.tag)}<small>#${esc(x.tag)}</small>
     <button class="x" data-del="${esc(x.tag)}" aria-label="履歴から消す">×</button></span>`).join("");
   $("recent").querySelectorAll("[data-tag]").forEach(el => { el.onclick = (e) => { if (!e.target.dataset.del) search(el.dataset.tag); }; });
   $("recent").querySelectorAll("[data-del]").forEach(el => {
     el.onclick = (e) => { e.stopPropagation(); writeRecent(readRecent().filter(x => x.tag !== el.dataset.del)); drawRecent(); };
   });
+}
+
+// ---- お気に入り(この端末だけ) ----
+// 開いたときの名前・リーグ・レートも一緒に残す(一覧を出すだけなら API を呼ばない)
+const FAV_KEY = "supaken.playerSearch.favorites";
+function readFavs() {
+  try { return JSON.parse(localStorage.getItem(FAV_KEY) || "[]").filter(x => x && x.tag); } catch { return []; }
+}
+function writeFavs(list) {
+  try { localStorage.setItem(FAV_KEY, JSON.stringify(list.slice(0, 50))); } catch {}
+}
+const isFav = (tag) => readFavs().some(x => x.tag === tag);
+function favInfo(p) {
+  const pol = p.pol || {};
+  const tenkai = pol.leagueNumber === TENKAI && pol.trophies > 0;
+  return { tag: clean(p.tag), name: p.name, league: pol.leagueNumber ?? null,
+           rating: tenkai ? pol.trophies : null, trophies: p.trophies ?? null, at: new Date().toISOString() };
+}
+function toggleFav(p) {
+  const tag = clean(p.tag);
+  const list = readFavs();
+  writeFavs(list.some(x => x.tag === tag) ? list.filter(x => x.tag !== tag) : [favInfo(p), ...list]);
+  drawFavs(); drawRecent(); render();
+}
+function drawFavs() {
+  const list = readFavs();
+  $("favs").innerHTML = list.length ? `<div class="favs-title">★ お気に入り</div><div class="fav-list">${list.map(x => {
+    const lg = LEAGUE_FILES[x.league];
+    return `<button class="fav" data-fav="${esc(x.tag)}">
+      ${lg ? `<img src="/assets/leagues/${lg}" alt="">` : ""}
+      <span class="fav-body"><b>${esc(x.name || "#" + x.tag)}</b><small>#${esc(x.tag)}${x.league ? ` · ${esc(LEAGUES[x.league] || "")}` : ""}</small></span>
+      <span class="fav-val">${x.rating != null ? esc(x.rating) : esc(x.trophies ?? "")}<small>${x.rating != null ? "レート" : "トロフィー"}</small></span>
+    </button>`;
+  }).join("")}</div>` : "";
+  $("favs").querySelectorAll("[data-fav]").forEach(el => { el.onclick = () => search(el.dataset.fav); });
 }
 
 // ---- 表示の部品 ----
@@ -275,6 +332,7 @@ function render() {
 
   $main.innerHTML = `
     <div class="banner">
+      <button class="star${isFav(tag) ? " on" : ""}" id="star">${isFav(tag) ? "★ お気に入り" : "☆ お気に入り"}</button>
       <div class="b-name">${esc(p.name)}</div>
       <div class="b-tag">${esc(p.tag)} · キングLv${esc(p.expLevel ?? "?")}</div>
       ${p.clan ? `<div class="b-clan">${esc(p.clan.name)}</div>` : ""}
@@ -303,6 +361,7 @@ function render() {
     ${bouts || `<div class="notice">対戦の記録がありません。</div>`}
     <p class="hint">クラロワAPIで見られるのは直近30試合くらいまでです。データは数分ごとに新しくなります。</p>`;
 
+  document.getElementById("star").onclick = () => toggleFav(p);
   $main.querySelectorAll(".bout-face").forEach(el => {
     el.onclick = () => { const i = +el.dataset.i; opened.has(i) ? opened.delete(i) : opened.add(i); render(); };
   });
@@ -322,6 +381,8 @@ async function search(raw) {
     if (!res.ok) throw new Error(body.error || "検索できませんでした");
     current = { tag, data: body };
     writeRecent([{ tag, name: body.player.name }, ...readRecent().filter(x => x.tag !== tag)]);
+    // お気に入りの人なら、一覧に出すレートなどを最新にする
+    if (isFav(tag)) { writeFavs(readFavs().map(x => x.tag === tag ? favInfo(body.player) : x)); drawFavs(); }
     drawRecent();
     $("refresh").hidden = false;
   } catch (e) {
@@ -336,6 +397,7 @@ $("refresh").onclick = async () => {
   $("refresh").classList.add("busy");
   try { await search(current.tag); } finally { $("refresh").classList.remove("busy"); }
 };
+drawFavs();
 drawRecent();
 const first = new URLSearchParams(location.search).get("tag");
 if (first) search(first);
