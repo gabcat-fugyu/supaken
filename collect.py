@@ -14,6 +14,7 @@ GitHub Actions から定期実行される前提。公式APIは直近25試合し
 """
 
 import hashlib
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 import re
@@ -118,6 +119,7 @@ def inspect_token(token: str):
     print("--------------------")
 
 
+WORKERS = int(os.environ.get("COLLECT_WORKERS", "6"))   # 同時に取りに行く人数
 RETRIES = 3          # 一時的な失敗(混雑・通信エラー)は数回やり直す
 RETRY_WAIT = 3       # やり直すまでの秒数(回数に応じて伸ばす)
 
@@ -959,6 +961,7 @@ def write_group_boards(summaries, challenge_year):
     app = load_json(DATA_DIR / "app-roster.json", {}) or {}
     by_tag = {str(s.get("tag", "")).lstrip("#").upper(): s for s in summaries}
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    written = 0
     for g in app.get("groups") or []:
         gid = str(g.get("id", ""))
         if not re.fullmatch(r"[A-Z0-9]{4,10}", gid):
@@ -970,8 +973,9 @@ def write_group_boards(summaries, challenge_year):
         if old.get("players") == players and old.get("challengeYear") == challenge_year:
             continue
         save_json(path, {"updatedAt": now, "challengeYear": challenge_year, "players": players})
+        written += 1
     if app.get("groups"):
-        print(f"グループ {len(app['groups'])}個のランキングを書き出しました")
+        print(f"::notice::グループ: {len(app['groups'])}個 / 書き出し {written}個")
 
 
 def main():
@@ -987,16 +991,24 @@ def main():
 
     print(f"{len(entries)}人分を取得します")
 
-    summaries = []
-    failed = 0
-    for i, (tag, label, groups, titles) in enumerate(entries):
-        # 1人目だけフィールドの中身を覗く(2v2リーグの調査用。不要になったら消す)
+    # 何人かずつ同時に取りに行く(1人ずつだと、登録が増えたとき10分の間に終わらない)
+    def fetch(item):
+        i, (tag, label, groups, titles) = item
         try:
-            result = collect_player(tag, label, groups, token, probe=(i == 0))
+            # 1人目だけフィールドの中身を覗く(2v2リーグの調査用。不要になったら消す)
+            return collect_player(tag, label, groups, token, probe=(i == 0))
         except Exception as e:
             # 1人のエラーで全員分の集計を止めない
             print(f"  エラー: {label or tag} の処理中に {type(e).__name__}: {e}", file=sys.stderr)
-            result = None
+            return None
+
+    started = time.time()
+    with ThreadPoolExecutor(max_workers=WORKERS) as pool:
+        results = list(pool.map(fetch, enumerate(entries)))
+
+    summaries = []
+    failed = 0
+    for (tag, label, groups, titles), result in zip(entries, results):
         if not result:
             # 取れなかった人は前回の結果で表示を続ける(ランキングから消さない)
             result = previous_summary(tag, label, groups)
@@ -1008,8 +1020,7 @@ def main():
             result["earned"] = auto + legacy_titles(titles)
             save_json(DATA_DIR / tag / "player.json", result)
             summaries.append(result)
-        if i < len(entries) - 1:
-            time.sleep(1)
+    print(f"::notice::取得: {len(entries)}アカウントを {time.time() - started:.0f}秒で(同時に{WORKERS}人ずつ)")
 
     # グループの一覧。players.json に書いた順を保つ
     all_groups = []
