@@ -248,6 +248,9 @@ async function accountAdd(request, env, id) {
   if (role === "main") stmts.push(env.DB.prepare("UPDATE app_tags SET role = 'sub' WHERE user_id = ? AND role = 'main'").bind(id));
   stmts.push(env.DB.prepare("INSERT INTO app_tags (user_id, tag, role, name, added_at) VALUES (?, ?, ?, ?, ?)")
     .bind(id, tag, role, p.name, iso()));
+  // 表示名がまだなら、入れてもらった表示名か、クラロワの名前をそのまま使う
+  const wanted = textOk(b.displayName, 16) || textOk(p.name, 16);
+  if (wanted) stmts.push(env.DB.prepare("UPDATE app_users SET display_name = ? WHERE id = ? AND display_name IS NULL").bind(wanted, id));
   await env.DB.batch(stmts);
   await moveTagGrants(env, tag, id);
   await writeRoster(env);

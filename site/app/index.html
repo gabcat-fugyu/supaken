@@ -622,6 +622,10 @@
   .hidden-acc span { opacity: 0.6; }
   .cr-btn.mini { font-size: 10.5px; padding: 3px 8px; border-bottom-width: 2px; }
   .cr-btn.danger { color: #ffd0d0; border-color: #a33; background: linear-gradient(180deg, #7a1d1d, #4a0f0f); }
+  .pf-msg { margin: 0 0 10px; padding: 8px 12px; border-radius: 10px; background: rgba(6,16,40,0.6); }
+  .setup h3 { font-size: 20px; }
+  .big-go { width: 100%; font-size: 16px !important; padding: 12px !important; }
+  .linkish { background: none; border: 0; color: var(--ink-dim); text-decoration: underline; font: inherit; font-size: 12px; cursor: pointer; }
   .hint-box { border-color: var(--gold) !important; font-size: 13px; line-height: 1.7; }
 </style>
 </head>
@@ -1673,6 +1677,8 @@ function drawProfile() {
   const userRow = (u, btns) => `<div class="acc">${avatarImg(u)}<span class="acc-body"><b>${esc(u.name)}</b></span><span class="acc-btns">${btns}</span></div>`;
 
   $main.innerHTML = `
+    ${profileMsg.err ? `<p class="err pf-msg">${esc(profileMsg.err)}</p>` : ""}
+    ${profileMsg.ok ? `<p class="ok pf-msg">${esc(profileMsg.ok)}</p>` : ""}
     <div class="pf">
       <h3>表示名</h3>
       <p class="note">グループのランキングに出る名前です。Google の名前はほかの人には出しません。</p>
@@ -1686,8 +1692,6 @@ function drawProfile() {
       <p class="note">メイン1つとサブ2つまで。ランキングには、一番リーグ(レート)が高いアカウントが出ます。同じならメインが出ます。</p>
       ${accRows}
       <div style="margin-top:10px">${addBox}</div>
-      ${profileMsg.err ? `<p class="err">${esc(profileMsg.err)}</p>` : ""}
-      ${profileMsg.ok ? `<p class="ok">${esc(profileMsg.ok)}</p>` : ""}
     </div>
     <div class="pf">
       <h3>友達</h3>
@@ -1717,6 +1721,7 @@ function drawProfile() {
     try { useMe(await fn()); profileMsg.ok = okMsg || ""; }
     catch (e) { profileMsg.err = e.message; }
     draw();
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const $ = (id) => document.getElementById(id);
   $("pf-save").onclick = () => run(() => api("/api/app/profile", { displayName: $("pf-name").value }), "表示名を保存しました");
@@ -1902,7 +1907,10 @@ function bindGrantBox() {
 // ---- グループ一覧(最初の画面) ----
 let homeMsg = { err: "", ok: "" }, homeForm = "";   // homeForm: "" / "create" / "join"
 
-async function openHome() {
+let setupSkipped = false;
+async function openHome(skipped) {
+  if (skipped === true) setupSkipped = true;
+  if (needsSetup() && !setupSkipped) return openSetup();
   view = "home"; groupId = null; selectedTag = null;
   try { window.history.replaceState(null, "", "/app/"); } catch {}
   draw();
@@ -2124,21 +2132,60 @@ function drawJoin() {
   };
 }
 
+// ---- はじめての設定(クラロワのアカウントと表示名) ----
+// ログインしただけで止まる人が多いので、アカウントを登録するまでは、まずこの画面を出す
+let setupNext = null, setupMsg = "";
+const needsSetup = () => me && !me.accounts.length;
+function openSetup(next) {
+  if (next) setupNext = next;
+  view = "setup"; setupMsg = ""; draw();
+}
+function drawSetup() {
+  $main.innerHTML = `<div class="pf setup">
+    <h3>あと1歩！</h3>
+    <p class="note">クラロワのアカウントを登録すると、ランキングに出て、戦績の分析も見られるようになります。</p>
+    <div class="t-label">① クラロワのタグ</div>
+    <div class="pf-row"><input id="su-tag" placeholder="#から始まるタグ" autocapitalize="characters" autocomplete="off"></div>
+    <p class="note">クラロワで自分のプロフィールを開いて、名前の下にある「#」から始まる英数字をタップするとコピーできます。そのまま貼り付けてください。</p>
+    <div class="t-label">② 表示名(ランキングに出る名前)</div>
+    <div class="pf-row"><input id="su-name" maxlength="16" placeholder="空欄ならクラロワの名前" value="${esc(me?.user?.hasName ? me.user.name : "")}"></div>
+    <p class="note">Google の名前はほかの人には出しません。あとでマイページから変えられます。</p>
+    <div style="margin-top:12px"><button class="cr-btn go gold big-go" id="su-go">はじめる</button></div>
+    <p class="err" id="su-err">${esc(setupMsg)}</p>
+    <div style="margin-top:6px;text-align:right"><button class="linkish" id="su-skip">あとで登録する</button></div>
+  </div>`;
+  const $ = (id) => document.getElementById(id);
+  $("su-go").onclick = async () => {
+    $("su-go").disabled = true; $("su-err").textContent = "確認中…";
+    try {
+      const name = $("su-name").value.trim();
+      let d = await api("/api/app/accounts/add", { tag: $("su-tag").value, displayName: name });
+      // 表示名が前から入っていて、新しく入れ直したとき
+      if (name && d.user.name !== name) d = await api("/api/app/profile", { displayName: name });
+      useMe(d);
+      const next = setupNext; setupNext = null;
+      next ? next() : openHome();
+    } catch (e) { setupMsg = e.message; $("su-err").textContent = e.message; $("su-go").disabled = false; }
+  };
+  $("su-skip").onclick = () => { const next = setupNext; setupNext = null; next ? next() : openHome(true); };
+}
+
 // ---- 画面の切り替え ----
 function draw() {
   if (view === "auth") return;
-  const top = view === "home";
+  const top = view === "home" || view === "setup";
   $back.hidden = top;
-  $navGroups.hidden = !top && view !== "board";
-  $navProfile.hidden = !top && view !== "board";
+  $navGroups.hidden = view === "setup" || (!top && view !== "board");
+  $navProfile.hidden = view === "setup" || (!top && view !== "board");
   $navHome.hidden = !top;
   $crest.textContent = view === "player" ? "PLAYER" : view === "profile" ? "MY PAGE"
-    : view === "group" ? "GROUP" : view === "board" ? "RANKING" : "GROUP RANKING";
+    : view === "group" ? "GROUP" : view === "board" ? "RANKING" : view === "setup" ? "WELCOME" : "GROUP RANKING";
   drawTabs();
   if (view === "home") return drawHome();
   if (view === "profile") return drawProfile();
   if (view === "group") return drawGroupPage();
   if (view === "join") return drawJoin();
+  if (view === "setup") return drawSetup();
   if (view === "player") return drawPlayer();
   if (!index) { $main.innerHTML = groupHeader() + `<div class="notice">読み込み中…</div>`; return; }
   drawBoard();
@@ -2167,9 +2214,9 @@ $refresh.onclick = () => {
   try { await loadMe(); }
   catch { return showAuth(reason); }
   $refresh.hidden = false;
-  if (q.get("join")) return openJoin(q.get("join"));
-  if (q.get("g")) return openGroup(q.get("g"));
-  openHome();
+  const go = q.get("join") ? () => openJoin(q.get("join")) : q.get("g") ? () => openGroup(q.get("g")) : null;
+  if (needsSetup()) return openSetup(go);
+  go ? go() : openHome();
 })();
 </script>
 </body>
