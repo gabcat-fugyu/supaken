@@ -13,31 +13,296 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/base.css">
-<title data-en="Sparky Ranking | Supaken Tools">スパーキーランキング | スパ研便利ツール</title>
+<title data-en="Card User Ranking | Supaken Tools">使い手ランキング | スパ研便利ツール</title>
+<style>
+  .head-btns { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .rail { display: flex; gap: 7px; overflow-x: auto; margin-bottom: 10px; padding: 2px 0 5px; }
+  .rail::-webkit-scrollbar { display: none; }
+  .rail .cr-btn { flex: 0 0 auto; font-size: 12px; font-weight: 800; padding: 7px 14px; }
+  .rail .cr-btn.on { color: #3d2600; text-shadow: none; background: linear-gradient(180deg, var(--gold-lite), var(--gold)); border-color: var(--gold-deep); }
+  .rail.sub .cr-btn { font-size: 11px; padding: 5px 11px; border-bottom-width: 3px; }
+  .rail .cr-btn small { font-weight: 700; opacity: 0.75; margin-left: 3px; }
+
+  /* カードを選ぶ */
+  .picker { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; padding: 10px; margin-bottom: 12px;
+            border-radius: 14px; background: rgba(6,16,40,0.55); max-height: 330px; overflow-y: auto; }
+  .pick { position: relative; display: block; min-width: 0; padding: 0; border: 2px solid transparent; border-radius: 9px;
+          background: none; cursor: pointer; font: inherit; color: var(--ink); }
+  .pick .pimg { position: relative; display: block; height: 0; padding-top: 120%; }
+  .pick img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .pick .cnt { position: absolute; right: 2px; bottom: 2px; font-size: 9.5px; font-weight: 800; line-height: 1;
+               padding: 2px 5px; border-radius: 6px; background: rgba(0,0,0,0.7); }
+  .pick.on { border-color: var(--gold); background: rgba(255,210,63,0.2); }
+  .pick.none { opacity: 0.35; }
+  .picker-toggle { margin: 0 0 10px; }
+
+  .sel { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin-bottom: 10px; border-radius: 14px;
+         background: linear-gradient(180deg, rgba(44,94,190,0.95), rgba(13,40,96,0.95)); border: 2px solid var(--gold-deep); }
+  .sel-img { width: 56px; height: 67px; flex-shrink: 0; }
+  .sel-img img { width: 100%; height: 100%; object-fit: contain; }
+  .sel b { display: block; font-family: 'Mochiy Pop One', sans-serif; font-weight: 400; font-size: 16px; }
+  .sel small { display: block; font-size: 11px; color: var(--ink-dim); margin-top: 3px; line-height: 1.5; }
+  .sel small em { font-style: normal; color: var(--gold-lite); font-weight: 800; }
+
+  .row { margin-bottom: 7px; border-radius: 14px; overflow: hidden;
+         background: linear-gradient(180deg, rgba(35,79,163,0.92), rgba(16,44,102,0.92)); border: 2px solid rgba(96,150,235,0.5); }
+  .row.g1 { border-color: var(--gold); } .row.g2 { border-color: #c9d4e3; } .row.g3 { border-color: #c97a3b; }
+  .face { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 11px; font: inherit; color: var(--ink);
+          background: none; border: 0; text-align: left; cursor: pointer; }
+  .medal { width: 30px; height: 30px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center;
+           font-family: 'Mochiy Pop One', sans-serif; font-size: 12px; background: rgba(6,16,40,0.6); border: 2px solid rgba(120,170,240,0.4); }
+  .g1 .medal { color: #3d2600; background: linear-gradient(180deg, var(--gold-lite), var(--gold)); border-color: var(--gold-deep); }
+  .g2 .medal { color: #1b2533; background: linear-gradient(180deg, #ffffff, #b9c6d8); border-color: #8496ad; }
+  .g3 .medal { color: #2e1503; background: linear-gradient(180deg, #ffc58f, #c97a3b); border-color: #8a4a1b; }
+  .body { flex: 1; min-width: 0; }
+  .line { display: flex; align-items: center; gap: 5px; min-width: 0; }
+  .name { font-weight: 800; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ach { flex-shrink: 0; font-size: 9px; font-weight: 800; padding: 2px 5px; border-radius: 5px; color: #fff4c8;
+         background: linear-gradient(135deg, #6a1bd1, #c81f6e 55%, #ff8a1f); border: 1px solid var(--gold); }
+  .evo { flex-shrink: 0; font-size: 9px; font-weight: 800; padding: 2px 5px; border-radius: 5px; color: #fff; background: #8a2be2; }
+  .hero { flex-shrink: 0; font-size: 9px; font-weight: 800; padding: 2px 5px; border-radius: 5px; color: #fff; background: var(--gold-deep); }
+  .sub { display: block; font-size: 10.5px; color: var(--ink-dim); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar { display: block; height: 4px; margin-top: 4px; border-radius: 2px; background: rgba(6,16,40,0.6); overflow: hidden; }
+  .bar span { display: block; height: 100%; background: linear-gradient(90deg, var(--gold-deep), var(--gold)); }
+  .val { flex-shrink: 0; text-align: right; font-family: 'Mochiy Pop One', sans-serif; font-size: 18px; color: var(--gold); }
+  .val small { display: block; font-family: 'M PLUS Rounded 1c', sans-serif; font-size: 9px; color: var(--ink-dim); }
+  .chev { color: var(--ink-dim); font-size: 10px; flex-shrink: 0; }
+
+  .decks { padding: 0 10px 10px; display: grid; gap: 10px; }
+  .who { display: flex; justify-content: space-between; font-size: 11px; font-weight: 800; color: var(--ink-dim); margin-bottom: 6px; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+  .slot { position: relative; border-radius: 8px; background: rgba(6,16,40,0.55); overflow: hidden; height: 0; padding-top: 120%; }
+  .slot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .slot .tag { position: absolute; left: 3px; top: 3px; font-size: 8px; font-weight: 800; line-height: 1; padding: 2px 4px; border-radius: 4px; color: #fff; }
+  .slot.evo-s { box-shadow: inset 0 0 0 2px #c77dff; } .slot.evo-s .tag { background: #8a2be2; }
+  .slot.hero-s { box-shadow: inset 0 0 0 2px var(--gold); } .slot.hero-s .tag { background: var(--gold-deep); }
+  .slot.hit { outline: 2px solid var(--gold-lite); outline-offset: -2px; }
+  .deck-foot { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 11px; color: var(--ink-dim); }
+  .tower { width: 26px; height: 26px; object-fit: contain; }
+  .avg { display: inline-flex; align-items: center; gap: 3px; }
+  .avg svg { width: 9px; height: 11px; fill: var(--elixir); }
+  .copy { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; text-decoration: none; font-size: 11px; font-weight: 800;
+          color: #3d2600; padding: 5px 10px; border-radius: 8px; background: linear-gradient(180deg, var(--gold-lite), var(--gold));
+          border: 2px solid var(--gold-deep); border-bottom-width: 3px; }
+  .copy svg { width: 10px; height: 10px; fill: currentColor; }
+  .notice { text-align: center; padding: 40px 18px; color: var(--ink-dim); font-size: 13px; line-height: 1.9; }
+  .summary { font-size: 11px; color: var(--ink-dim); line-height: 1.6; margin: 2px 2px 12px; }
+  .more { display: block; width: 100%; margin: 4px 0 10px; }
+</style>
 </head>
 <body>
 <div class="wrap">
   <div class="masthead">
-    <span class="crest">⚡ SPARKY RANKING</span>
+    <span class="crest">CARD USERS</span>
     <span class="head-btns" id="head-btns"><a class="cr-btn" href="/" data-en="← Home">← トップ</a></span>
   </div>
-  <div id="main"></div>
+  <div id="main"><div class="notice" data-en="Loading…">読み込み中…</div></div>
   <p class="fine">This material is unofficial and is not endorsed by Supercell.<br>For more information see Supercell's Fan Content Policy: www.supercell.com/fan-content-policy.</p>
 </div>
 <button id="refresh" class="refresh" aria-label="更新">⟳</button>
-<style>.head-btns { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }</style>
 <script src="/i18n.js"></script>
-<script src="/sparky-view.js"></script>
 <script>
-  // スパーキーランキングの集計結果は Sparkylab リポジトリにある(誰でも見られる公開データ)
-  I18N.button(document.getElementById("head-btns"));
-  document.getElementById("head-btns").prepend(document.querySelector("#head-btns .lang-wrap"));
-  SparkyView.mount(document.getElementById("main"), { repo: "gabcat-fugyu/Sparkylab", branch: "main" });
-  const $refresh = document.getElementById("refresh");
-  $refresh.onclick = async () => {
-    $refresh.classList.add("busy");
-    try { await SparkyView.reload(); } finally { $refresh.classList.remove("busy"); }
-  };
+// 使い手ランキング。日本・世界の上位(各1000人)のうち、そのカードを直近の試合の半分以上で使っている人を
+// レートの高い順に並べる。集計は Sparkylab(data/users.json)。カードはどれでも選べる(最初はスパーキー)
+const REPO = "gabcat-fugyu/Sparkylab", BRANCH = "main";
+const $main = document.getElementById("main");
+const T = I18N.t;
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const DROP = `<svg viewBox="0 0 10 13" aria-hidden="true"><path d="M5 0C5 0 0 5.6 0 8.6A5 5 0 0 0 10 8.6C10 5.6 5 0 5 0z"/></svg>`;
+const COPY_ICON = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1h8a2 2 0 0 1 2 2v8h-2V3H5zM1 5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2z"/></svg>`;
+const SPARKY = 26000033;
+const PAGE = 30;
+
+// カードの分け方。主軸はメン限ページの「よく当たるデッキ」と同じ一覧+ガーゴイルジャイアント
+const WIN_CONDITIONS = new Set([
+  "Hog Rider", "Royal Giant", "Giant", "Golem", "Lava Hound", "Balloon",
+  "X-Bow", "Mortar", "Graveyard", "Miner", "Goblin Barrel", "Ram Rider",
+  "Battle Ram", "Royal Hogs", "Elixir Golem", "Electro Giant", "Goblin Giant",
+  "Giant Skeleton", "Three Musketeers", "Sparky", "Wall Breakers",
+  "Skeleton Barrel", "Goblin Drill", "Mega Knight", "P.E.K.K.A",
+  "Royal Recruits", "Rocket", "Minion Giant",
+]);
+const CATS = [
+  { id: "win", label: () => T("主軸", "Win conditions") },
+  { id: "spell", label: () => T("スペル", "Spells") },
+  { id: "other", label: () => T("その他", "Others") },
+];
+const isSpell = (id) => String(id).startsWith("28");
+const catOf = (id) => WIN_CONDITIONS.has(card(id).n) ? "win" : isSpell(id) ? "spell" : "other";
+
+let data = null, failed = false, region = "jp", cardId = SPARKY, cat = "win", picking = false, shown = PAGE;
+const opened = new Set();
+{
+  // リンクで ?card=ID を付ければ、そのカードで開く
+  const q = Number(new URLSearchParams(location.search).get("card"));
+  if (q) cardId = q;
+}
+
+async function loadJson(path) {
+  try {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/contents/data/${path}?ref=${BRANCH}&t=${Date.now()}`,
+      { cache: "no-store", headers: { Accept: "application/vnd.github.raw" } });
+    if (res.ok) return await res.json();
+  } catch {}
+  const res = await fetch(`https://raw.githubusercontent.com/${REPO}/${BRANCH}/data/${path}?t=${Date.now()}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(String(res.status));
+  return await res.json();
+}
+
+function ago(iso) {
+  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (!(m >= 0)) return "";
+  if (m < 1) return T("たった今", "just now");
+  if (m < 60) return T(m + "分前", m + " min ago");
+  const h = Math.floor(m / 60);
+  return h < 24 ? T(h + "時間前", h + " h ago") : T(Math.floor(h / 24) + "日前", Math.floor(h / 24) + " days ago");
+}
+
+const card = (id) => data?.cards?.[String(id)] || {};
+const regionName = (r) => r.key === "jp" ? T("日本", "Japan") : T("世界", "Global");
+function img(id, kind) {
+  const c = card(id);
+  const url = (kind === "evo" && c.i?.evolutionMedium) || (kind === "hero" && c.i?.heroMedium) || c.i?.medium || "";
+  return url ? `<img src="${esc(url)}" alt="${esc(c.n || "")}" loading="lazy">` : "";
+}
+
+// その地域の上位に入っている人だけ
+const inRegion = (p) => !!p.r?.[region];
+// カードごとの使い手の人数(選ぶ一覧に出す)
+function userCounts() {
+  const n = {};
+  for (const p of data.players || []) if (inRegion(p)) for (const k of Object.keys(p.q || {})) n[k] = (n[k] || 0) + 1;
+  return n;
+}
+
+function deckHtml(d, p) {
+  const ids = d.c.map(([id]) => id);
+  const costs = ids.map(id => card(id).e).filter(v => typeof v === "number");
+  const avg = costs.length ? (costs.reduce((a, b) => a + b, 0) / costs.length).toFixed(1) : null;
+  const copy = ids.length === 8
+    ? `https://link.clashroyale.com/en/?clashroyale://copyDeck?deck=${ids.join(";")}&l=Royals${d.t ? `&tt=${d.t}` : ""}` : null;
+  const wr = d.w + d.l ? Math.round(d.w / (d.w + d.l) * 1000) / 10 : null;
+  return `<div>
+    <div class="who"><span>${T(`${d.n}試合で使用`, `Used in ${d.n} battles`)}</span><span>${wr == null ? "" : T(`勝率 ${wr}%`, `Win ${wr}%`)}</span></div>
+    <div class="grid">${d.c.map(([id, ev], i) => {
+      const kind = i < 3 && ev === 1 ? "evo" : i < 3 && ev === 2 ? "hero" : "";
+      return `<div class="slot${kind ? ` ${kind}-s` : ""}${id === cardId ? " hit" : ""}">${img(id, kind)}${
+        kind ? `<span class="tag">${kind === "evo" ? T("進化", "Evo") : T("ヒーロー", "Hero")}</span>` : ""}</div>`;
+    }).join("")}</div>
+    <div class="deck-foot">
+      ${d.t && card(d.t).i?.medium ? `<img class="tower" src="${esc(card(d.t).i.medium)}" alt="">` : ""}
+      ${avg ? `<span class="avg">${DROP} ${T("平均", "Avg")} ${avg}</span>` : ""}
+      ${copy ? `<a class="copy" href="${esc(copy)}" target="_blank" rel="noopener">${COPY_ICON}${T("コピー", "Copy")}</a>` : ""}
+    </div>
+  </div>`;
+}
+
+function render() {
+  if (failed) { $main.innerHTML = `<div class="notice">${T("まだ集計されていません。<br>しばらくしてから開き直してください。", "No data yet.<br>Please check back a little later.")}</div>`; return; }
+  if (!data) { $main.innerHTML = `<div class="notice">${T("読み込み中…", "Loading…")}</div>`; return; }
+  const regions = data.regions || [];
+  const r = regions.find(x => x.key === region) || regions[0];
+  if (!r) { $main.innerHTML = `<div class="notice">${T("集計結果がありません。", "No results.")}</div>`; return; }
+  region = r.key;
+
+  const counts = userCounts();
+  const key = String(cardId);
+  const list = (data.players || []).filter(p => inRegion(p) && p.q?.[key])
+    .sort((a, b) => (b.r[region][1] ?? -1) - (a.r[region][1] ?? -1));
+  const sel = card(cardId);
+
+  // 選ぶ一覧: 分類ごとに、使い手の多い順。使い手がいないカードも薄く出す
+  const ids = Object.keys(data.cards || {}).map(Number).filter(id => catOf(id) === cat)
+    .sort((a, b) => (counts[b] || 0) - (counts[a] || 0));
+  const catCount = (c) => Object.keys(data.cards || {}).map(Number).filter(id => catOf(id) === c && counts[id]).length;
+  const picker = picking ? `
+    <div class="rail sub">${CATS.map(c =>
+      `<button class="cr-btn${c.id === cat ? " on" : ""}" data-cat="${c.id}">${esc(c.label())}<small>${catCount(c.id)}</small></button>`).join("")}</div>
+    <div class="picker">${ids.map(id => `<button class="pick${id === cardId ? " on" : ""}${counts[id] ? "" : " none"}" data-card="${id}" title="${esc(card(id).n || "")}">
+      <span class="pimg">${img(id)}</span><span class="cnt">${counts[id] || 0}</span></button>`).join("")}</div>` : "";
+
+  const rows = list.slice(0, shown).map((p, i) => {
+    const [used, wins, decided, ev] = p.q[key];
+    const use = p.n ? Math.round(used / p.n * 100) : 0;
+    const wr = decided ? Math.round(wins / decided * 1000) / 10 : null;
+    const isOpen = opened.has(p.tag);
+    const decks = (p.d || []).filter(d => d.c.some(([id]) => id === cardId));
+    const evoMostly = ev / used >= 0.5;
+    const heroMostly = evoMostly && (p.d || []).some(d => d.c.some(([id, e], j) => id === cardId && j < 3 && e === 2));
+    const [rank, rating] = p.r[region];
+    return `<div class="row${i < 3 ? " g" + (i + 1) : ""}">
+      <button class="face" data-tag="${esc(p.tag)}" aria-expanded="${isOpen}">
+        <span class="medal">${i + 1}</span>
+        <span class="body">
+          <span class="line"><span class="name">${esc(p.name)}</span>${p.a ? `<span class="ach">${T("20勝達成", "20 Wins")}</span>` : ""}${
+            evoMostly ? (heroMostly ? `<span class="hero">${T("ヒーロー", "Hero")}</span>` : `<span class="evo">${T("進化", "Evo")}</span>`) : ""}</span>
+          <span class="sub">${T(`使用率 ${use}%`, `Usage ${use}%`)}${wr != null ? ` · ${T("勝率", "Win")} ${wr}%` : ""} · ${
+            T(`${esc(regionName(r))}${rank}位`, `${esc(regionName(r))} #${rank}`)}${p.clan ? ` · ${esc(p.clan)}` : ""}</span>
+          <span class="bar"><span style="width:${Math.min(100, use)}%"></span></span>
+        </span>
+        <span class="val">${rating != null ? esc(rating) : "—"}<small>${T("レート", "Rating")}</small></span>
+        <span class="chev">${isOpen ? "▲" : "▼"}</span>
+      </button>
+      ${isOpen ? `<div class="decks">${(decks.length ? decks : p.d || []).map(d => deckHtml(d, p)).join("") ||
+        `<div class="notice" style="padding:12px">${T("デッキ情報なし", "No deck data")}</div>`}</div>` : ""}
+    </div>`;
+  }).join("");
+
+  $main.innerHTML = `
+    <div class="rail">${regions.map(x =>
+      `<button class="cr-btn${x.key === r.key ? " on" : ""}" data-region="${esc(x.key)}">${esc(regionName(x))}</button>`).join("")}</div>
+    <div class="sel">
+      <span class="sel-img">${img(cardId)}</span>
+      <span><b>${esc(sel.n || "?")}</b>
+        <small>${T(`${esc(regionName(r))}の上位${r.scanned}人のうち、直近の試合の<em>${Math.round((data.threshold ?? 0.5) * 100)}%以上</em>でこのカードを使っている<em>${list.length}人</em>。レートの高い順。`,
+          `<em>${list.length}</em> of the top ${r.scanned} players in ${esc(regionName(r))} use this card in at least <em>${Math.round((data.threshold ?? 0.5) * 100)}%</em> of their recent battles, sorted by rating.`)}</small></span>
+    </div>
+    <button class="cr-btn picker-toggle" id="pick-toggle">${picking ? T("閉じる", "Close") : T("カードを選ぶ", "Choose a card")}</button>
+    ${picker}
+    ${rows || `<div class="notice">${T("このカードの使い手はいませんでした。", "No players use this card.")}</div>`}
+    ${shown < list.length ? `<button class="cr-btn more" id="more">${T(`さらに${Math.min(PAGE, list.length - shown)}人`, `Show ${Math.min(PAGE, list.length - shown)} more`)}</button>` : ""}
+    <p class="summary">${T("タップでその人のデッキ(このカード入り)が見られます。", "Tap a player to see their deck with this card.")}${
+      data.updatedAt ? `<br>${T("更新", "Updated")} ${esc(ago(data.updatedAt))}` : ""}</p>`;
+
+  const on = (sel, fn) => $main.querySelectorAll(sel).forEach(el => { el.onclick = () => fn(el); });
+  on("[data-region]", el => { region = el.dataset.region; shown = PAGE; opened.clear(); render(); });
+  on("[data-cat]", el => { cat = el.dataset.cat; render(); });
+  on("[data-card]", el => {
+    cardId = Number(el.dataset.card); picking = false; shown = PAGE; opened.clear();
+    try { window.history.replaceState(null, "", `/ranking/?card=${cardId}`); } catch {}
+    render(); window.scrollTo(0, 0);
+  });
+  on("#pick-toggle", () => { picking = !picking; if (picking) cat = catOf(cardId); render(); });
+  on("[data-tag]", el => { const t = el.dataset.tag; opened.has(t) ? opened.delete(t) : opened.add(t); render(); });
+  on("#more", () => { shown += PAGE; render(); });
+}
+
+async function load() {
+  try { data = await loadJson("users.json"); failed = false; }
+  catch {
+    // 使い手ランキングの集計がまだ無いうちは、前のスパーキーランキングを出しておく
+    if (!data) return fallbackSparky();
+  }
+  render();
+}
+
+function fallbackSparky() {
+  const sc = document.createElement("script");
+  sc.src = "/sparky-view.js";
+  sc.onload = () => SparkyView.mount($main, { repo: REPO, branch: BRANCH });
+  document.body.appendChild(sc);
+}
+
+const $refresh = document.getElementById("refresh");
+$refresh.onclick = async () => {
+  $refresh.classList.add("busy");
+  try { await load(); } finally { $refresh.classList.remove("busy"); }
+};
+I18N.button(document.getElementById("head-btns"));
+document.getElementById("head-btns").prepend(document.querySelector("#head-btns .lang-wrap"));
+I18N.onChange(() => render());
+load();
 </script>
 </body>
 </html>
