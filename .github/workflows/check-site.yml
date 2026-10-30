@@ -59,7 +59,9 @@ jobs:
           except Exception:
               out.append(f"検索API: {st} {body[:200]!r}")
           st, h, body = get(B + "/api/public/player?tag=ZZZZ"); out.append(f"検索API(おかしなタグ): {st}")
+          # お知らせ欄は1ステップ10件までしか出ないので、3行ずつまとめて出す
           for line in out:
               print(line)
-              print(f"::notice title=確認::{line}")
+          for i in range(0, len(out), 3):
+              print(f"::notice title=確認{i // 3 + 1}::{' / '.join(out[i:i + 3])}")
           PY
