@@ -388,7 +388,7 @@ async function search(raw) {
   render();
   try { window.history.replaceState(null, "", `/player/?tag=${tag}`); } catch {}
   try {
-    const res = await fetch(`/api/public/player?tag=${encodeURIComponent(tag)}`);
+    const res = await fetch(`/api/public/player?tag=${encodeURIComponent(tag)}&t=${Date.now()}`, { cache: "no-store" });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       const msg = res.status === 400 ? T(body.error, "That tag doesn't look right. Use the # code with 0289PYLQGRJCUV.")

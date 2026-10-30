@@ -590,8 +590,11 @@ async function publicPlayer(url, env, ctx) {
   if (!TAG_CHARS.test(tag)) return fail(400, "タグが正しくありません。#から始まる英数字(0289PYLQGRJCUV)を入れてください");
   const cacheKey = new Request(`https://${MAIN_HOST}/api/public/player?tag=${tag}`);
   const cache = caches.default;
+  // 取っておいた結果はサーバー側(Cloudflare)でだけ使い、ブラウザには取っておかせない
+  const fresh = (res) => new Response(res.body, { status: res.status, headers: {
+    "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
   const hit = await cache.match(cacheKey);
-  if (hit) return hit;
+  if (hit) return fresh(hit);
 
   const [pr, br] = await Promise.all([crGet(env, `/players/%23${tag}`), crGet(env, `/players/%23${tag}/battlelog`)]);
   if (pr.status === 404) return fail(404, "プレイヤーが見つかりませんでした。タグを確かめてください");
@@ -626,7 +629,7 @@ async function publicPlayer(url, env, ctx) {
   };
   const res = json(body, 200, { "cache-control": `public, max-age=${SEARCH_CACHE_SECONDS}` });
   ctx.waitUntil(cache.put(cacheKey, res.clone()));
-  return res;
+  return fresh(res);
 }
 
 // ---- 戦績データ ----
