@@ -1675,9 +1675,9 @@ function drawProfile() {
   $main.innerHTML = `
     <div class="pf">
       <h3>表示名</h3>
-      <p class="note">グループのランキングに出る名前です。</p>
+      <p class="note">グループのランキングに出る名前です。Google の名前はほかの人には出しません。</p>
       <div class="pf-row">
-        <input id="pf-name" maxlength="16" value="${esc(user.name || "")}">
+        <input id="pf-name" maxlength="16" placeholder="表示名" value="${esc(user.hasName ? user.name : "")}">
         <button class="cr-btn go gold" id="pf-save">保存</button>
       </div>
     </div>
@@ -1922,6 +1922,10 @@ function drawHome() {
       <span class="acc-btns"><button class="cr-btn go gold" data-inv-accept="${esc(i.groupId)}">参加</button><button class="cr-btn" data-inv-decline="${esc(i.groupId)}">断る</button></span>
     </div>`).join("");
   $main.innerHTML = `
+    ${me.user.hasName ? "" : `<div class="pf hint-box"><b>はじめに、表示名を決めてください。</b><br>
+      グループのランキングやメンバー一覧に出る名前です(Google の名前はほかの人には出しません)。
+      <div class="pf-row" style="margin-top:8px"><input id="first-name" maxlength="16" placeholder="表示名(16文字まで)">
+      <button class="cr-btn go gold" id="first-name-save">決める</button></div></div>`}
     ${me.accounts.length ? "" : `<div class="pf hint-box">まず👤マイページで<b>クラロワのアカウント</b>を登録してください。登録すると、入っているグループのランキングに出ます。
       <div style="margin-top:8px"><button class="cr-btn go gold" id="go-profile">マイページへ</button></div></div>`}
     ${invites ? `<div class="pf"><h3>グループへの招待</h3>${invites}</div>` : ""}
@@ -1960,6 +1964,7 @@ function drawHome() {
   $main.querySelectorAll("[data-inv-accept]").forEach(b => { b.onclick = () => run(() => api("/api/app/invites/accept", { groupId: b.dataset.invAccept }), d => openGroup(d.joined)); });
   $main.querySelectorAll("[data-inv-decline]").forEach(b => { b.onclick = () => run(() => api("/api/app/invites/decline", { groupId: b.dataset.invDecline })); });
   if ($("go-profile")) $("go-profile").onclick = () => openProfile();
+  if ($("first-name-save")) $("first-name-save").onclick = () => run(() => api("/api/app/profile", { displayName: $("first-name").value }));
   $("show-create").onclick = () => { homeForm = homeForm === "create" ? "" : "create"; homeMsg = { err: "", ok: "" }; draw(); };
   $("show-join").onclick = () => { homeForm = homeForm === "join" ? "" : "join"; homeMsg = { err: "", ok: "" }; draw(); };
   if ($("gc-go")) $("gc-go").onclick = () => run(() => api("/api/app/groups/create", { name: $("gc-name").value, password: $("gc-pass").value }),

@@ -160,8 +160,10 @@ async function googleCallback(request, env) {
 async function userRow(env, id) {
   return env.DB.prepare("SELECT * FROM app_users WHERE id = ?").bind(id).first();
 }
+// ほかの人に見せる名前は、本人が決めた表示名だけ(Google の本名は出さない)
+const NO_NAME = "名無しさん";
 const pubUser = (r) => r && {
-  id: r.id, name: r.display_name || r.name || "名無し", avatar: r.avatar || null,
+  id: r.id, name: r.display_name || NO_NAME, avatar: r.avatar || null,
 };
 async function myTags(env, id) {
   const { results } = await env.DB.prepare(
@@ -186,7 +188,7 @@ async function myFriends(env, id) {
   ).bind(id, id, id).all();
   const friends = [], incoming = [], outgoing = [];
   for (const r of results || []) {
-    const u = { id: r.uid, name: r.display_name || r.name || "名無し", avatar: r.avatar || null };
+    const u = { id: r.uid, name: r.display_name || NO_NAME, avatar: r.avatar || null };
     if (r.status === "friends") friends.push(u);
     else if (r.requested_by === id) outgoing.push(u);
     else incoming.push(u);
@@ -200,7 +202,7 @@ async function myInvites(env, id) {
      JOIN app_groups g ON g.id = i.group_id LEFT JOIN app_users u ON u.id = i.inviter_id
      WHERE i.user_id = ? ORDER BY i.created_at DESC`
   ).bind(id).all();
-  return (results || []).map((r) => ({ groupId: r.group_id, groupName: r.group_name, inviter: r.display_name || r.name || "?" }));
+  return (results || []).map((r) => ({ groupId: r.group_id, groupName: r.group_name, inviter: r.display_name || NO_NAME }));
 }
 
 async function me(env, id) {
@@ -210,7 +212,7 @@ async function me(env, id) {
     myTags(env, id), myGroups(env, id), myFriends(env, id), myInvites(env, id), titlesOf(env, id),
   ]);
   return {
-    user: { ...pubUser(row), googleName: row.name, friendCode: row.friend_code, admin: isAdmin(env, id) },
+    user: { ...pubUser(row), hasName: !!row.display_name, googleName: row.name, friendCode: row.friend_code, admin: isAdmin(env, id) },
     accounts, groups, friends: friends.friends, friendRequests: { incoming: friends.incoming, outgoing: friends.outgoing },
     invites, titles,
   };
@@ -496,7 +498,7 @@ async function groupMembers(env, gid) {
      ORDER BY t.role = 'main' DESC, t.added_at`
   ).bind(gid, gid).all()).results || [] : [];
   return users.map((u) => ({
-    id: u.user_id, name: u.display_name || u.name || "名無し", avatar: u.avatar || null, role: u.role,
+    id: u.user_id, name: u.display_name || NO_NAME, avatar: u.avatar || null, role: u.role,
     accounts: tags.filter((t) => t.user_id === u.user_id).map((t) => ({ tag: t.tag, role: t.role, name: t.name, hidden: !!t.hidden })),
   }));
 }
