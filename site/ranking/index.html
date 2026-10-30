@@ -13,21 +13,25 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/base.css">
-<title>スパーキーランキング | スパ研便利ツール</title>
+<title data-en="Sparky Ranking | Supaken Tools">スパーキーランキング | スパ研便利ツール</title>
 </head>
 <body>
 <div class="wrap">
   <div class="masthead">
     <span class="crest">⚡ SPARKY RANKING</span>
-    <a class="cr-btn" href="/">← トップ</a>
+    <span class="head-btns" id="head-btns"><a class="cr-btn" href="/" data-en="← Home">← トップ</a></span>
   </div>
   <div id="main"></div>
   <p class="fine">This material is unofficial and is not endorsed by Supercell.<br>For more information see Supercell's Fan Content Policy: www.supercell.com/fan-content-policy.</p>
 </div>
 <button id="refresh" class="refresh" aria-label="更新">⟳</button>
+<style>.head-btns { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }</style>
+<script src="/i18n.js"></script>
 <script src="/sparky-view.js"></script>
 <script>
   // スパーキーランキングの集計結果は Sparkylab リポジトリにある(誰でも見られる公開データ)
+  I18N.button(document.getElementById("head-btns"));
+  document.getElementById("head-btns").prepend(document.querySelector("#head-btns .lang-wrap"));
   SparkyView.mount(document.getElementById("main"), { repo: "gabcat-fugyu/Sparkylab", branch: "main" });
   const $refresh = document.getElementById("refresh");
   $refresh.onclick = async () => {

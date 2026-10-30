@@ -13,8 +13,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/base.css">
-<title>プレイヤー検索 | スパ研便利ツール</title>
+<title data-en="Player Search | Supaken Tools">プレイヤー検索 | スパ研便利ツール</title>
 <style>
+  .head-btns { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
   .search { display: flex; gap: 8px; }
   .search input {
     flex: 1; min-width: 0; font: inherit; font-size: 16px; font-weight: 800; color: var(--ink);
@@ -139,19 +140,20 @@
 <div class="wrap">
   <div class="masthead">
     <span class="crest">PLAYER SEARCH</span>
-    <a class="cr-btn" href="/">← トップ</a>
+    <span class="head-btns" id="head-btns"><a class="cr-btn" href="/" data-en="← Home">← トップ</a></span>
   </div>
   <form class="search" id="form">
-    <input id="q" placeholder="#タグ を入れて検索" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text">
-    <button class="cr-btn go" type="submit">検索</button>
+    <input id="q" placeholder="#タグ を入れて検索" data-en-placeholder="Enter a #tag" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text">
+    <button class="cr-btn go" type="submit" data-en="Search">検索</button>
   </form>
-  <p class="hint">タグは、クラロワのプロフィールで名前の下にある「#」から始まる英数字です。名前では探せません。</p>
+  <p class="hint" data-en="Your tag is the code starting with “#” under your name on your Clash Royale profile. Searching by name isn't supported.">タグは、クラロワのプロフィールで名前の下にある「#」から始まる英数字です。名前では探せません。</p>
   <div class="favs" id="favs"></div>
   <div class="recent" id="recent"></div>
   <div id="main"></div>
   <p class="fine">This material is unofficial and is not endorsed by Supercell.<br>For more information see Supercell's Fan Content Policy: www.supercell.com/fan-content-policy.</p>
 </div>
 <button id="refresh" class="refresh" aria-label="更新" hidden>⟳</button>
+<script src="/i18n.js"></script>
 <script>
 // プレイヤー検索。タグを入れると、その人のプロフィールと直近の対戦をクラロワAPIから取ってくる(/api/public/player)。
 // 検索した人は、この端末にだけ履歴を残す(ワンタップで開き直せるように)
@@ -161,7 +163,13 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const clean = (t) => String(t || "").toUpperCase().replace(/[^0-9A-Z]/g, "").replace(/O/g, "0");
 
-const LEAGUES = { 1: "マスターI", 2: "マスターII", 3: "マスターIII", 4: "神々の挑戦I", 5: "神々の挑戦II", 6: "神々の挑戦III", 7: "天界" };
+const T = I18N.t;
+const LEAGUE_NAMES = {
+  1: ["マスターI", "Master I"], 2: ["マスターII", "Master II"], 3: ["マスターIII", "Master III"],
+  4: ["神々の挑戦I", "Champion"], 5: ["神々の挑戦II", "Grand Champion"], 6: ["神々の挑戦III", "Royal Champion"],
+  7: ["天界", "Ultimate Champion"],
+};
+const leagueName = (n) => LEAGUE_NAMES[n] ? T(...LEAGUE_NAMES[n]) : "";
 const LEAGUE_FILES = {
   1: "icon_League_Badge_Master_1.png", 2: "icon_League_Badge_Master_2.png", 3: "icon_League_Badge_Master_3.png",
   4: "icon_League_Badge_Champion.png", 5: "icon_League_Badge_Grand_Champion.png", 6: "icon_League_Badge_Royal_Champion.png",
@@ -169,11 +177,13 @@ const LEAGUE_FILES = {
 };
 const TENKAI = 7;
 const MODES = {
-  pathOfLegend: "ランクマッチ", PvP: "トロフィー戦", trail: "イベント", tournament: "大会", friendly: "フレンド",
-  clanMate: "クラン内", clanMate2v2: "クラン内 2v2", riverRacePvP: "クラン対戦", riverRaceDuel: "クラン対戦(デュエル)",
-  riverRaceDuelColosseum: "クラン対戦(デュエル)", boatBattle: "ボートバトル", challenge: "チャレンジ",
-  casual1v1: "カジュアル", casual2v2: "2v2", "2v2": "2v2",
+  pathOfLegend: ["ランクマッチ", "Ranked"], PvP: ["トロフィー戦", "Trophy Road"], trail: ["イベント", "Event"],
+  tournament: ["大会", "Tournament"], friendly: ["フレンド", "Friendly"], clanMate: ["クラン内", "Clan friendly"],
+  clanMate2v2: ["クラン内 2v2", "Clan 2v2"], riverRacePvP: ["クラン対戦", "Clan War"], riverRaceDuel: ["クラン対戦(デュエル)", "Clan War duel"],
+  riverRaceDuelColosseum: ["クラン対戦(デュエル)", "Clan War duel"], boatBattle: ["ボートバトル", "Boat battle"],
+  challenge: ["チャレンジ", "Challenge"], casual1v1: ["カジュアル", "Casual"], casual2v2: ["2v2", "2v2"], "2v2": ["2v2", "2v2"],
 };
+const modeName = (b) => MODES[b.type] ? T(...MODES[b.type]) : (b.mode || b.type || "");
 const DROP = `<svg viewBox="0 0 10 13" aria-hidden="true"><path d="M5 0C5 0 0 5.6 0 8.6A5 5 0 0 0 10 8.6C10 5.6 5 0 5 0z"/></svg>`;
 const COPY_ICON = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1h8a2 2 0 0 1 2 2v8h-2V3H5zM1 5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2z"/></svg>`;
 
@@ -189,7 +199,7 @@ function drawRecent() {
   const favs = new Set(readFavs().map(x => x.tag));
   const list = readRecent().filter(x => !favs.has(x.tag));
   $("recent").innerHTML = list.map(x => `<span class="chip" data-tag="${esc(x.tag)}">${esc(x.name || "#" + x.tag)}<small>#${esc(x.tag)}</small>
-    <button class="x" data-del="${esc(x.tag)}" aria-label="履歴から消す">×</button></span>`).join("");
+    <button class="x" data-del="${esc(x.tag)}" aria-label="${T("履歴から消す", "Remove")}">×</button></span>`).join("");
   $("recent").querySelectorAll("[data-tag]").forEach(el => { el.onclick = (e) => { if (!e.target.dataset.del) search(el.dataset.tag); }; });
   $("recent").querySelectorAll("[data-del]").forEach(el => {
     el.onclick = (e) => { e.stopPropagation(); writeRecent(readRecent().filter(x => x.tag !== el.dataset.del)); drawRecent(); };
@@ -220,12 +230,12 @@ function toggleFav(p) {
 }
 function drawFavs() {
   const list = readFavs();
-  $("favs").innerHTML = list.length ? `<div class="favs-title">★ お気に入り</div><div class="fav-list">${list.map(x => {
+  $("favs").innerHTML = list.length ? `<div class="favs-title">★ ${T("お気に入り", "Favorites")}</div><div class="fav-list">${list.map(x => {
     const lg = LEAGUE_FILES[x.league];
     return `<button class="fav" data-fav="${esc(x.tag)}">
       ${lg ? `<img src="/assets/leagues/${lg}" alt="">` : ""}
-      <span class="fav-body"><b>${esc(x.name || "#" + x.tag)}</b><small>#${esc(x.tag)}${x.league ? ` · ${esc(LEAGUES[x.league] || "")}` : ""}</small></span>
-      <span class="fav-val">${x.rating != null ? esc(x.rating) : esc(x.trophies ?? "")}<small>${x.rating != null ? "レート" : "トロフィー"}</small></span>
+      <span class="fav-body"><b>${esc(x.name || "#" + x.tag)}</b><small>#${esc(x.tag)}${x.league ? ` · ${esc(leagueName(x.league))}` : ""}</small></span>
+      <span class="fav-val">${x.rating != null ? esc(x.rating) : esc(x.trophies ?? "")}<small>${x.rating != null ? T("レート", "Rating") : T("トロフィー", "Trophies")}</small></span>
     </button>`;
   }).join("")}</div>` : "";
   $("favs").querySelectorAll("[data-fav]").forEach(el => { el.onclick = () => search(el.dataset.fav); });
@@ -241,7 +251,7 @@ function slot(c, i) {
   const url = (kind === "evo" && c.iconUrls?.evolutionMedium) || (kind === "hero" && c.iconUrls?.heroMedium) || c.iconUrls?.medium || "";
   const lv = cardLevel(c);
   return `<div class="slot ${kind}">${url ? `<img src="${esc(url)}" alt="${esc(c.name || "")}" loading="lazy">` : ""}${
-    kind ? `<span class="tag">${kind === "evo" ? "進化" : "ヒーロー"}</span>` : ""}${
+    kind ? `<span class="tag">${kind === "evo" ? T("進化", "Evo") : T("ヒーロー", "Hero")}</span>` : ""}${
     lv != null ? `<span class="lv${lv === MAX_LEVEL ? " max" : ""}">${lv === MAX_LEVEL ? "MAX" : "Lv" + lv}</span>` : ""}</div>`;
 }
 
@@ -253,7 +263,7 @@ function copyUrl(cards, support) {
 }
 
 function deckHtml(cards, support, who) {
-  if (!cards || !cards.length) return `<div class="notice" style="padding:14px">デッキ情報なし</div>`;
+  if (!cards || !cards.length) return `<div class="notice" style="padding:14px">${T("デッキ情報なし", "No deck data")}</div>`;
   const costs = cards.map(c => c.elixirCost).filter(v => typeof v === "number");
   const avg = costs.length ? (costs.reduce((a, b) => a + b, 0) / costs.length).toFixed(1) : null;
   const tower = (support || [])[0];
@@ -262,8 +272,8 @@ function deckHtml(cards, support, who) {
     <div class="grid">${cards.map(slot).join("")}</div>
     <div class="deck-foot">
       ${tower?.iconUrls?.medium ? `<img class="tower" src="${esc(tower.iconUrls.medium)}" alt="${esc(tower.name || "")}" title="${esc(tower.name || "")}">` : ""}
-      ${avg ? `<span class="avg">${DROP} 平均 ${avg}</span>` : ""}
-      ${copy ? `<a class="copy" href="${esc(copy)}" target="_blank" rel="noopener">${COPY_ICON}コピー</a>` : ""}
+      ${avg ? `<span class="avg">${DROP} ${T("平均", "Avg")} ${avg}</span>` : ""}
+      ${copy ? `<a class="copy" href="${esc(copy)}" target="_blank" rel="noopener">${COPY_ICON}${T("コピー", "Copy")}</a>` : ""}
     </div>`;
 }
 
@@ -271,7 +281,7 @@ function parseTime(raw) {
   const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/.exec(raw || "");
   return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6])) : null;
 }
-const fmtTime = (d) => d ? d.toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+const fmtTime = (d) => d ? d.toLocaleString(I18N.locale, { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
 
 function result(b, tag) {
   const me = (b.team || []).find(x => clean(x.tag) === tag) || (b.team || [])[0] || {};
@@ -281,11 +291,12 @@ function result(b, tag) {
 }
 
 // ---- 画面 ----
+const deckOf = (name) => T(`${name} のデッキ`, `${name}'s deck`);
 let current = null, opened = new Set();
 
 function render() {
   if (!current) { $main.innerHTML = ""; return; }
-  if (current.loading) { $main.innerHTML = `<div class="notice">#${esc(current.tag)} を検索中…</div>`; return; }
+  if (current.loading) { $main.innerHTML = `<div class="notice">${T(`#${esc(current.tag)} を検索中…`, `Searching #${esc(current.tag)}…`)}</div>`; return; }
   if (current.error) { $main.innerHTML = `<div class="notice err">${esc(current.error)}</div>`; return; }
 
   const { player: p, battles } = current.data;
@@ -293,7 +304,7 @@ function render() {
   const pol = p.pol || {};
   const league = pol.leagueNumber;
   const tenkai = league === TENKAI && typeof pol.trophies === "number" && pol.trophies > 0;
-  const rank = (r) => typeof r === "number" && r > 0 ? `世界${r.toLocaleString()}位` : "順位なし";
+  const rank = (r) => typeof r === "number" && r > 0 ? T(`世界${r.toLocaleString()}位`, `Global #${r.toLocaleString()}`) : T("順位なし", "Unranked");
   const seasonChip = (label, s) => s && typeof s.trophies === "number" && s.trophies > 0
     ? `<span class="s-chip"><i>${label}</i>${esc(s.trophies)}<small>${esc(rank(s.rank))}</small></span>` : "";
 
@@ -310,56 +321,57 @@ function render() {
     const ch = me.trophyChange;
     const partner = (b.team || []).length > 1 ? (b.team || []).find(x => clean(x.tag) !== tag) : null;
     const isOpen = opened.has(i);
-    const mode = MODES[b.type] || b.mode || b.type || "";
+    const mode = modeName(b);
     return `<div class="bout ${r}">
       <button class="bout-face" data-i="${i}" aria-expanded="${isOpen}">
         <span class="verdict">${r === "win" ? "WIN" : r === "lose" ? "LOSE" : "DRAW"}</span>
         <span class="bout-body">
           <span class="bout-vs">vs ${esc(op.name || "?")}${(b.opponent || []).length > 1 ? ` & ${esc(b.opponent[1].name || "")}` : ""}</span>
-          <span class="bout-meta">${esc(mode)}${b.type === "pathOfLegend" && b.leagueNumber === TENKAI ? "(天界)" : ""} · ${esc(fmtTime(parseTime(b.battleTime)))}${
+          <span class="bout-meta">${esc(mode)}${b.type === "pathOfLegend" && b.leagueNumber === TENKAI ? T("(天界)", " (Ultimate)") : ""} · ${esc(fmtTime(parseTime(b.battleTime)))}${
             typeof ch === "number" && ch !== 0 ? ` · <span class="delta ${ch > 0 ? "up" : "down"}">${ch > 0 ? "+" + ch : ch}</span>` : ""}</span>
         </span>
         <span class="score">${mc}-${oc}</span>
         <span class="chev">${isOpen ? "▲" : "▼"}</span>
       </button>
       ${isOpen ? `<div class="decks">
-        <div>${deckHtml(me.cards, me.supportCards, `${me.name || "自分"} のデッキ`)}</div>
-        ${partner ? `<div>${deckHtml(partner.cards, partner.supportCards, `${partner.name || "味方"} のデッキ`)}</div>` : ""}
-        ${(b.opponent || []).map(o => `<div>${deckHtml(o.cards, o.supportCards, `${o.name || "相手"} のデッキ`)}</div>`).join("")}
+        <div>${deckHtml(me.cards, me.supportCards, deckOf(me.name || T("自分", "Player")))}</div>
+        ${partner ? `<div>${deckHtml(partner.cards, partner.supportCards, deckOf(partner.name || T("味方", "Teammate")))}</div>` : ""}
+        ${(b.opponent || []).map(o => `<div>${deckHtml(o.cards, o.supportCards, deckOf(o.name || T("相手", "Opponent")))}</div>`).join("")}
       </div>` : ""}
     </div>`;
   }).join("");
 
   $main.innerHTML = `
     <div class="banner">
-      <button class="star${isFav(tag) ? " on" : ""}" id="star">${isFav(tag) ? "★ お気に入り" : "☆ お気に入り"}</button>
+      <button class="star${isFav(tag) ? " on" : ""}" id="star">${isFav(tag) ? "★ " : "☆ "}${T("お気に入り", "Favorite")}</button>
       <div class="b-name">${esc(p.name)}</div>
-      <div class="b-tag">${esc(p.tag)} · キングLv${esc(p.expLevel ?? "?")}</div>
+      <div class="b-tag">${esc(p.tag)} · ${T("キングLv", "King Lv")}${esc(p.expLevel ?? "?")}</div>
       ${p.clan ? `<div class="b-clan">${esc(p.clan.name)}</div>` : ""}
-      ${(p.crl20Years || []).length ? `<div class="chips">${p.crl20Years.map(y => `<span class="c20">20勝達成(${esc(y)})</span>`).join("")}</div>` : ""}
+      ${(p.crl20Years || []).length ? `<div class="chips">${p.crl20Years.map(y => `<span class="c20">${T(`20勝達成(${esc(y)})`, `20 Wins (${esc(y)})`)}</span>`).join("")}</div>` : ""}
       ${LEAGUE_FILES[league] ? `<img class="b-shield" src="/assets/leagues/${LEAGUE_FILES[league]}" alt="">
-        <div class="b-league">${esc(LEAGUES[league] || "")}</div>` : ""}
+        <div class="b-league">${esc(leagueName(league))}</div>` : ""}
       ${tenkai
-        ? `<div class="plaque"><span>レート</span><b>${esc(pol.trophies)}</b></div>
-           ${pol.rank ? `<div class="b-foot">世界${esc(pol.rank.toLocaleString())}位</div>` : ""}`
-        : `<div class="plaque"><span>トロフィー</span><b>${esc(p.trophies ?? "—")}</b></div>`}
-      <div class="chips">${seasonChip("前シーズン", p.lastPol)}${seasonChip("最高シーズン", p.bestPol)}</div>
-      <div class="b-foot">トロフィー最高 ${esc(p.bestTrophies ?? "—")}${tenkai ? ` · 今のトロフィー ${esc(p.trophies ?? "—")}` : ""}</div>
+        ? `<div class="plaque"><span>${T("レート", "Rating")}</span><b>${esc(pol.trophies)}</b></div>
+           ${pol.rank ? `<div class="b-foot">${esc(rank(pol.rank))}</div>` : ""}`
+        : `<div class="plaque"><span>${T("トロフィー", "Trophies")}</span><b>${esc(p.trophies ?? "—")}</b></div>`}
+      <div class="chips">${seasonChip(T("前シーズン", "Last season"), p.lastPol)}${seasonChip(T("最高シーズン", "Best season"), p.bestPol)}</div>
+      <div class="b-foot">${T("トロフィー最高", "Best trophies")} ${esc(p.bestTrophies ?? "—")}${tenkai ? ` · ${T("今のトロフィー", "Trophies")} ${esc(p.trophies ?? "—")}` : ""}</div>
     </div>
 
     <div class="tiles">
-      <div class="tile"><b>${esc((p.wins ?? 0).toLocaleString())}</b><small>通算勝利</small></div>
-      <div class="tile"><b>${pct(p.wins || 0, total)}</b><small>通算勝率</small></div>
-      <div class="tile"><b style="color:#8fd6ff">${pct(wins, decided.length)}</b><small>直近${battles.length}戦</small></div>
-      <div class="tile"><b style="color:var(--gold)">${pct(rWins, ranked.length)}</b><small>直近ランクマ</small></div>
+      <div class="tile"><b>${esc((p.wins ?? 0).toLocaleString())}</b><small>${T("通算勝利", "Total wins")}</small></div>
+      <div class="tile"><b>${pct(p.wins || 0, total)}</b><small>${T("通算勝率", "Win rate")}</small></div>
+      <div class="tile"><b style="color:#8fd6ff">${pct(wins, decided.length)}</b><small>${T(`直近${battles.length}戦`, `Last ${battles.length}`)}</small></div>
+      <div class="tile"><b style="color:var(--gold)">${pct(rWins, ranked.length)}</b><small>${T("直近ランクマ", "Recent ranked")}</small></div>
     </div>
 
-    <div class="sect"><span class="sect-title">今のデッキ</span><span class="sect-note">最後に対戦したときのデッキ</span></div>
+    <div class="sect"><span class="sect-title">${T("今のデッキ", "Current deck")}</span><span class="sect-note">${T("最後に対戦したときのデッキ", "Deck from their last battle")}</span></div>
     <div class="deckbox">${deckHtml(p.deck, p.deckSupport)}</div>
 
-    <div class="sect"><span class="sect-title">直近の対戦</span><span class="sect-note">${battles.length}試合 · タップでデッキ</span></div>
-    ${bouts || `<div class="notice">対戦の記録がありません。</div>`}
-    <p class="hint">クラロワAPIで見られるのは直近30試合くらいまでです。データは数分ごとに新しくなります。</p>`;
+    <div class="sect"><span class="sect-title">${T("直近の対戦", "Recent battles")}</span><span class="sect-note">${T(`${battles.length}試合 · タップでデッキ`, `${battles.length} battles · tap for decks`)}</span></div>
+    ${bouts || `<div class="notice">${T("対戦の記録がありません。", "No battles found.")}</div>`}
+    <p class="hint">${T("クラロワAPIで見られるのは直近30試合くらいまでです。データは数分ごとに新しくなります。",
+      "The Clash Royale API only shows about the last 30 battles. Data refreshes every few minutes.")}</p>`;
 
   document.getElementById("star").onclick = () => toggleFav(p);
   $main.querySelectorAll(".bout-face").forEach(el => {
@@ -378,7 +390,13 @@ async function search(raw) {
   try {
     const res = await fetch(`/api/public/player?tag=${encodeURIComponent(tag)}`);
     const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(body.error || "検索できませんでした");
+    if (!res.ok) {
+      const msg = res.status === 400 ? T(body.error, "That tag doesn't look right. Use the # code with 0289PYLQGRJCUV.")
+        : res.status === 404 ? T(body.error, "Player not found. Please check the tag.")
+        : res.status === 502 ? T(body.error, "Couldn't reach the Clash Royale servers. Please try again shortly.")
+        : T(body.error || "検索できませんでした", "Search failed.");
+      throw new Error(msg || T("検索できませんでした", "Search failed."));
+    }
     current = { tag, data: body };
     writeRecent([{ tag, name: body.player.name }, ...readRecent().filter(x => x.tag !== tag)]);
     // お気に入りの人なら、一覧に出すレートなどを最新にする
@@ -386,7 +404,7 @@ async function search(raw) {
     drawRecent();
     $("refresh").hidden = false;
   } catch (e) {
-    current = { tag, error: e.message || "検索できませんでした" };
+    current = { tag, error: e.message || T("検索できませんでした", "Search failed.") };
   }
   render();
 }
@@ -397,6 +415,9 @@ $("refresh").onclick = async () => {
   $("refresh").classList.add("busy");
   try { await search(current.tag); } finally { $("refresh").classList.remove("busy"); }
 };
+I18N.button(document.getElementById("head-btns"));
+document.getElementById("head-btns").prepend(document.querySelector("#head-btns .lang-wrap"));
+I18N.onChange(() => { drawFavs(); drawRecent(); render(); });
 drawFavs();
 drawRecent();
 const first = new URLSearchParams(location.search).get("tag");

@@ -9,6 +9,9 @@
  *   SparkyView.reload();   // 更新ボタンから
  */
 window.SparkyView = (function () {
+  // 言語(誰でも見られるページは i18n.js で日本語/英語を切り替える。メン限ページは日本語だけ)
+  const T = (ja, en) => (window.I18N ? window.I18N.t(ja, en) : ja);
+
   // カードのレベル。APIの level はレアリティ内の相対値なので、
   // maxLevel から実際の表示レベルを逆算する(カンストは全レアリティ16)
   const MAX_LEVEL = 16;
@@ -17,7 +20,7 @@ window.SparkyView = (function () {
       : Math.min(MAX_LEVEL, c.level + (MAX_LEVEL - (typeof c.maxLevel === "number" ? c.maxLevel : MAX_LEVEL)));
 
   // デッキ左3枠の役割。進化が乗るのは1枠目とワイルドの3枠目
-  const SLOT_ROLES = ["進化", "ヒーロー", "ワイルド"];
+  const SLOT_ROLES = () => [T("進化", "Evo"), T("ヒーロー", "Hero"), T("ワイルド", "Wild")];
   const EVO_SLOTS = [0, 2];
 
   const DROP = `<svg viewBox="0 0 10 13" aria-hidden="true"><path d="M5 0C5 0 0 5.6 0 8.6A5 5 0 0 0 10 8.6C10 5.6 5 0 5 0z"/></svg>`;
@@ -41,10 +44,10 @@ window.SparkyView = (function () {
     const d = new Date(iso);
     if (isNaN(d.getTime())) return "";
     const m = Math.floor((Date.now() - d.getTime()) / 60000);
-    if (m < 1) return "たった今";
-    if (m < 60) return m + "分前";
+    if (m < 1) return T("たった今", "just now");
+    if (m < 60) return T(m + "分前", m + " min ago");
     const h = Math.floor(m / 60);
-    return h < 24 ? h + "時間前" : Math.floor(h / 24) + "日前";
+    return h < 24 ? T(h + "時間前", h + " h ago") : T(Math.floor(h / 24) + "日前", Math.floor(h / 24) + " days ago");
   }
 
   // ---- 見た目 ----
@@ -207,7 +210,7 @@ window.SparkyView = (function () {
   }
 
   // ---- 状態 ----
-  let host = null, conf = null;
+  let host = null, conf = null, listening = false;
   let data = null, failed = false, region = "jp", busy = false;
   const opened = new Set();
 
@@ -244,7 +247,7 @@ window.SparkyView = (function () {
     const url = (evo && c.iconUrls?.evolutionMedium) || c.iconUrls?.medium || "";
     const lv = cardLevel(c);
     const maxed = lv === MAX_LEVEL;
-    const role = SLOT_ROLES[i];
+    const role = SLOT_ROLES()[i];
     return `<div class="sv-slot${role ? ` r${i}` : ""}${evo ? " evo" : ""}">
       ${url ? `<img src="${esc(url)}" alt="${esc(c.name || "")}" loading="lazy">` : ""}
       ${role ? `<span class="sv-role">${esc(role)}</span>` : ""}
@@ -255,43 +258,47 @@ window.SparkyView = (function () {
   function deckHtml(p) {
     const cards = p.deck || [];
     const support = p.supportCards || [];
-    if (!cards.length && !support.length) return `<div class="sv-empty">デッキ情報なし</div>`;
+    if (!cards.length && !support.length) return `<div class="sv-empty">${T("デッキ情報なし", "No deck data")}</div>`;
     const costs = cards.map(c => c.elixirCost).filter(v => typeof v === "number");
     const avg = costs.length ? (costs.reduce((a, b) => a + b, 0) / costs.length).toFixed(1) : null;
     const copy = deckCopyUrl(cards, support);
     return `
       <div class="sv-deck-head">
-        <span class="sv-who">${esc(p.name || "")} のデッキ</span>
+        <span class="sv-who">${T(`${esc(p.name || "")} のデッキ`, `${esc(p.name || "")}'s deck`)}</span>
         <span class="sv-tools">
-          ${avg ? `<span class="sv-avg">${DROP} 平均 ${avg}</span>` : ""}
-          ${copy ? `<a class="sv-copy" href="${esc(copy)}" target="_blank" rel="noopener">${COPY_ICON}コピー</a>` : ""}
+          ${avg ? `<span class="sv-avg">${DROP} ${T("平均", "Avg")} ${avg}</span>` : ""}
+          ${copy ? `<a class="sv-copy" href="${esc(copy)}" target="_blank" rel="noopener">${COPY_ICON}${T("コピー", "Copy")}</a>` : ""}
         </span>
       </div>
       ${cards.length ? `<div class="sv-grid">${cards.map(cardSlot).join("")}</div>` : ""}
       ${support.length ? `<div class="sv-support">
-        <span class="sv-support-cap">タワー</span>
+        <span class="sv-support-cap">${T("タワー", "Tower")}</span>
         <div class="sv-support-grid">${support.map(c => cardSlot(c, -1)).join("")}</div>
       </div>` : ""}`;
   }
 
+  // 地域の名前と達成バッジの名前(データには日本語で入っている)
+  const regionLabel = (r) => r.key === "jp" ? T("日本", "Japan") : r.key === "global" ? T("世界", "Global") : (r.label || r.key);
+  const achLabel = (a) => a === "20勝達成" ? T("20勝達成", "20 Wins") : a;
+
   function render() {
     if (!host) return;
 
-    if (busy && !data) { host.innerHTML = `<div class="sv-notice">読み込み中…</div>`; return; }
+    if (busy && !data) { host.innerHTML = `<div class="sv-notice">${T("読み込み中…", "Loading…")}</div>`; return; }
     if (failed) {
       host.innerHTML = `<div class="sv-notice">
-        まだ集計されていません。<br>しばらくしてから開き直してください。</div>`;
+        ${T("まだ集計されていません。<br>しばらくしてから開き直してください。", "No data yet.<br>Please check back a little later.")}</div>`;
       return;
     }
-    if (!data) { host.innerHTML = `<div class="sv-notice">読み込み中…</div>`; return; }
+    if (!data) { host.innerHTML = `<div class="sv-notice">${T("読み込み中…", "Loading…")}</div>`; return; }
 
     const regions = data.regions || [];
     const r = regions.find(x => x.key === region) || regions[0];
-    if (!r) { host.innerHTML = `<div class="sv-notice">集計結果がありません。</div>`; return; }
+    if (!r) { host.innerHTML = `<div class="sv-notice">${T("集計結果がありません。", "No results.")}</div>`; return; }
 
     const tabs = regions.length > 1
       ? `<div class="sv-rail">${regions.map(x =>
-          `<button class="sv-btn${x.key === r.key ? " on" : ""}" data-sv-region="${esc(x.key)}">${esc(x.label)}</button>`
+          `<button class="sv-btn${x.key === r.key ? " on" : ""}" data-sv-region="${esc(x.key)}">${esc(regionLabel(x))}</button>`
         ).join("")}</div>` : "";
 
     const list = r.players || [];
@@ -305,10 +312,10 @@ window.SparkyView = (function () {
           <span class="sv-body">
             <span class="sv-line">
               <span class="sv-name">${esc(p.name)}</span>${(p.achievements || []).map(a =>
-                `<span class="sv-ach" title="${esc(a)}">${STAR}${esc(a)}</span>`).join("")}
+                `<span class="sv-ach" title="${esc(achLabel(a))}">${STAR}${esc(achLabel(a))}</span>`).join("")}
             </span>
-            <span class="sv-sub">使用率 ${p.usageRate}%${
-              p.winRate != null ? ` · 勝率 ${p.winRate}%` : ""}${p.clan ? ` · ${esc(p.clan)}` : ""}</span>
+            <span class="sv-sub">${T("使用率", "Usage")} ${p.usageRate}%${
+              p.winRate != null ? ` · ${T("勝率", "Win")} ${p.winRate}%` : ""}${p.clan ? ` · ${esc(p.clan)}` : ""}</span>
             <span class="sv-bar"><span style="width:${Math.min(100, p.usageRate)}%"></span></span>
           </span>
           <span class="sv-value">${p.rating != null ? esc(p.rating) : "—"}</span>
@@ -321,17 +328,21 @@ window.SparkyView = (function () {
     host.innerHTML = `
       ${tabs}
       <div class="sv-lede">
-        ${esc(r.label)}の上位<b>${esc(r.scanned ?? "?")}</b>人のうち、直近の対戦の
+        ${T(`${esc(regionLabel(r))}の上位<b>${esc(r.scanned ?? "?")}</b>人のうち、直近の対戦の
         <b>${Math.round((data.threshold ?? 0.5) * 100)}%以上</b>で
-        ${esc(data.card || "スパーキー")}を使っていた<b>${list.length}</b>人。レートの高い順。
-        <br>タップでデッキが見られます。${r.stale
-          ? `<br>※今回は${esc(r.label)}のランキングが取得できなかったため、前回の集計を表示しています。` : ""}
+        ${esc(data.card === "Sparky" || !data.card ? "スパーキー" : data.card)}を使っていた<b>${list.length}</b>人。レートの高い順。
+        <br>タップでデッキが見られます。`,
+        `<b>${list.length}</b> of the top <b>${esc(r.scanned ?? "?")}</b> players in ${esc(regionLabel(r))} who used
+        ${esc(data.card || "Sparky")} in at least <b>${Math.round((data.threshold ?? 0.5) * 100)}%</b> of their recent battles,
+        sorted by rating.<br>Tap a player to see their deck.`)}${r.stale
+          ? T(`<br>※今回は${esc(regionLabel(r))}のランキングが取得できなかったため、前回の集計を表示しています。`,
+              `<br>* The ${esc(regionLabel(r))} leaderboard couldn't be fetched this time, so the previous results are shown.`) : ""}
       </div>
-      ${list.length ? rows : `<div class="sv-notice">該当する人がいませんでした。</div>`}
+      ${list.length ? rows : `<div class="sv-notice">${T("該当する人がいませんでした。", "No players found.")}</div>`}
       ${shown < list.length
-        ? `<button class="sv-more" data-sv-more="1">さらに${Math.min(PAGE, list.length - shown)}人</button>`
+        ? `<button class="sv-more" data-sv-more="1">${T(`さらに${Math.min(PAGE, list.length - shown)}人`, `Show ${Math.min(PAGE, list.length - shown)} more`)}</button>`
         : ""}
-      ${data.updatedAt ? `<div class="sv-updated">最終更新 ${esc(ago(data.updatedAt))}</div>` : ""}
+      ${data.updatedAt ? `<div class="sv-updated">${T("最終更新", "Updated")} ${esc(ago(data.updatedAt))}</div>` : ""}
     `;
 
     host.querySelectorAll("[data-sv-region]").forEach(b => {
@@ -371,9 +382,10 @@ window.SparkyView = (function () {
     mount(el, options) {
       injectCss();
       host = el;
+      if (window.I18N && !listening) { listening = true; window.I18N.onChange(() => render()); }
       const opts = options || {};
       const repo = opts.repo || guessRepo();
-      if (!repo) { host.innerHTML = `<div class="sv-notice">読み込み先が分かりません。</div>`; return; }
+      if (!repo) { host.innerHTML = `<div class="sv-notice">${T("読み込み先が分かりません。", "Data source not found.")}</div>`; return; }
       conf = { repo, branch: opts.branch || "main" };
       if (data || failed) render();
       else load();

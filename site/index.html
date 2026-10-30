@@ -13,9 +13,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/base.css">
-<title>スパ研便利ツール</title>
+<title data-en="Supaken Tools">スパ研便利ツール</title>
 <style>
-  .hero { text-align: center; padding: 34px 0 26px; }
+  .topbar { display: flex; justify-content: flex-end; }
+  .hero { text-align: center; padding: 14px 0 26px; }
   .kicker {
     margin: 0 0 8px; font-size: 10px; font-weight: 800; letter-spacing: 0.32em; color: var(--ink-dim);
   }
@@ -61,36 +62,39 @@
 </head>
 <body>
 <div class="wrap">
+  <div class="topbar" id="topbar"></div>
   <header class="hero">
     <p class="kicker">SUPAKEN TOOLS</p>
-    <h1 class="title">スパ研便利ツール</h1>
+    <h1 class="title" data-en="Supaken Tools">スパ研便利ツール</h1>
     <div class="rule"></div>
   </header>
 
   <nav class="tools">
     <a class="tool" href="/ranking/">
       <span class="tool-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#ffe07a" d="M13.5 1 3.5 13.6h6.6L8.8 23l11.7-13.4h-7z"/></svg></span>
-      <span class="tool-body"><b>スパーキーランキング</b><small>日本と世界の上位で、スパーキーを使っている人のランキング</small></span>
-      <span class="tool-tag">誰でも</span>
+      <span class="tool-body"><b data-en="Sparky Ranking">スパーキーランキング</b><small data-en="Top-ranked players in Japan and worldwide who play Sparky">日本と世界の上位で、スパーキーを使っている人のランキング</small></span>
+      <span class="tool-tag" data-en="Public">誰でも</span>
     </a>
     <a class="tool" href="/decks/">
       <span class="tool-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#ffe07a" d="M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm5 4.5-3 4.5 3 4.5 3-4.5z"/></svg></span>
-      <span class="tool-body"><b>天界デッキランキング</b><small>世界TOP100・TOP1000、日本TOP1000の人が天界で使っているデッキ</small></span>
-      <span class="tool-tag">誰でも</span>
+      <span class="tool-body"><b data-en="Ranked Deck Ranking">天界デッキランキング</b><small data-en="Decks used in Ultimate Champion by the global top 100 / 1000 and Japan top 1000">世界TOP100・TOP1000、日本TOP1000の人が天界で使っているデッキ</small></span>
+      <span class="tool-tag" data-en="Public">誰でも</span>
     </a>
     <a class="tool" href="/player/">
       <span class="tool-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#ffe07a" d="M10 2a8 8 0 0 1 6.3 12.9l5.4 5.4-1.4 1.4-5.4-5.4A8 8 0 1 1 10 2zm0 2a6 6 0 1 0 0 12 6 6 0 0 0 0-12z"/></svg></span>
-      <span class="tool-body"><b>プレイヤー検索</b><small>タグで検索。レート・今のデッキ・直近の対戦とデッキが見られます</small></span>
-      <span class="tool-tag">誰でも</span>
+      <span class="tool-body"><b data-en="Player Search">プレイヤー検索</b><small data-en="Look up any player by tag: rating, current deck and recent battles with decks">タグで検索。レート・今のデッキ・直近の対戦とデッキが見られます</small></span>
+      <span class="tool-tag" data-en="Public">誰でも</span>
     </a>
     <a class="tool member" href="/member/">
       <span class="tool-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#ffd23f" d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm-3 8V7a3 3 0 0 1 6 0v3zm3 4a2 2 0 0 1 1 3.7V19h-2v-1.3A2 2 0 0 1 12 14z"/></svg></span>
-      <span class="tool-body"><b>メン限ページ</b><small>メンバーの順位表・戦績・プロフィール。Discord のメン限ロールで入れます</small></span>
-      <span class="tool-tag">メン限</span>
+      <span class="tool-body"><b data-en="Members Only">メン限ページ</b><small data-en="Leaderboard, stats and profiles for Supaken members. Sign in with Discord (members role required)">メンバーの順位表・戦績・プロフィール。Discord のメン限ロールで入れます</small></span>
+      <span class="tool-tag" data-en="Members">メン限</span>
     </a>
   </nav>
 
   <p class="fine">This material is unofficial and is not endorsed by Supercell.<br>For more information see Supercell's Fan Content Policy: www.supercell.com/fan-content-policy.</p>
 </div>
+<script src="/i18n.js"></script>
+<script>I18N.button(document.getElementById("topbar"));</script>
 </body>
 </html>
