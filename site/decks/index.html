@@ -18,7 +18,8 @@
   .rail { display: flex; gap: 7px; overflow-x: auto; margin-bottom: 10px; padding: 2px 0 5px; }
   .rail::-webkit-scrollbar { display: none; }
   .rail .cr-btn { flex: 0 0 auto; font-size: 12px; font-weight: 800; padding: 7px 14px; }
-  .rail .cr-btn.on { color: #3d2600; background: linear-gradient(180deg, var(--gold-lite), var(--gold)); border-color: var(--gold-deep); }
+  .rail .cr-btn.on { color: #3d2600; background: linear-gradient(180deg, var(--gold-lite), var(--gold)); border-color: var(--gold-deep);
+                     text-shadow: none; }   /* 金色のボタンに影を付けると文字が二重に見える */
   .rail.sub .cr-btn { font-size: 11px; padding: 5px 11px; border-bottom-width: 3px; }
   .summary { font-size: 11px; color: var(--ink-dim); line-height: 1.6; margin: 2px 2px 12px; }
   .summary b { color: var(--gold-lite); }
@@ -73,7 +74,7 @@
 <body>
 <div class="wrap">
   <div class="masthead">
-    <span class="crest">🃏 DECK RANKING</span>
+    <span class="crest">DECK RANKING</span>
     <a class="cr-btn" href="/">← トップ</a>
   </div>
   <div id="main"><div class="notice">読み込み中…</div></div>
