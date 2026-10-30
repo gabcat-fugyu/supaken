@@ -59,6 +59,10 @@ jobs:
           except Exception:
               out.append(f"検索API: {st} {body[:200]!r}")
           st, h, body = get(B + "/api/public/player?tag=ZZZZ"); out.append(f"検索API(おかしなタグ): {st}")
+          st, h, body = get(B + "/app/"); out.append(f"グループランキング: {st}")
+          st, h, body = get(B + "/api/app/me"); out.append(f"グループ(未ログイン): {st}")
+          st, h, body = get(B + "/api/google/login")
+          out.append(f"Googleログイン: {st} → {(h.get('location') or '')[:40]}")
           # お知らせ欄は1ステップ10件までしか出ないので、3行ずつまとめて出す
           for line in out:
               print(line)

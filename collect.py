@@ -944,7 +944,34 @@ def read_players():
             if tag and tag not in known:
                 entries.append((tag, None, [], []))
                 known.add(tag)
+    # グループランキング(Google ログイン)で登録されたアカウント(Worker が書く app-roster.json)
+    for tag in (load_json(DATA_DIR / "app-roster.json", {}) or {}).get("tags") or []:
+        tag = str(tag).strip().upper().lstrip("#")
+        if tag and tag not in known:
+            entries.append((tag, None, [], []))
+            known.add(tag)
     return entries
+
+
+def write_group_boards(summaries, challenge_year):
+    """グループごとに、メンバーのアカウントの戦績をまとめて書き出す(groups/<ID>/players.json)。
+    Worker はこれを読んで、グループのランキングを返す。"""
+    app = load_json(DATA_DIR / "app-roster.json", {}) or {}
+    by_tag = {str(s.get("tag", "")).lstrip("#").upper(): s for s in summaries}
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    for g in app.get("groups") or []:
+        gid = str(g.get("id", ""))
+        if not re.fullmatch(r"[A-Z0-9]{4,10}", gid):
+            continue
+        players = [by_tag[t] for t in g.get("tags") or [] if t in by_tag]
+        path = DATA_DIR / "groups" / gid / "players.json"
+        old = load_json(path, {}) or {}
+        # 中身が変わっていなければ書かない(R2 への書き込み回数を節約)
+        if old.get("players") == players and old.get("challengeYear") == challenge_year:
+            continue
+        save_json(path, {"updatedAt": now, "challengeYear": challenge_year, "players": players})
+    if app.get("groups"):
+        print(f"グループ {len(app['groups'])}個のランキングを書き出しました")
 
 
 def main():
@@ -1005,6 +1032,8 @@ def main():
             "players": summaries,
         },
     )
+
+    write_group_boards(summaries, max(years) if years else None)
 
     if failed == len(entries):
         raise SystemExit("1人も取得できませんでした。players.json を確認してください")

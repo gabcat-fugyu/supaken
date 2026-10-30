@@ -1,0 +1,2171 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07173a">
+<title>グループランキング | スパ研便利ツール</title>
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<!-- black-translucent だと時計やバッテリーの帯がページに重なって文字が読みにくい -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Battle Log">
+
+<!-- ホーム画面に追加したときのアイコン -->
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/assets/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/assets/icon-512.png">
+
+<link rel="stylesheet" href="/titles.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    /* アリーナの配色 */
+    --arena-deep: #07173a;
+    --arena-mid:  #12306e;
+    --arena-lite: #1c4699;
+    --panel-edge: #3a6fd8;
+
+    --gold:       #ffd23f;
+    --gold-deep:  #b8790a;
+    --gold-lite:  #ffe89a;
+
+    --blue-side:  #4a9dff;   /* 自分 */
+    --red-side:   #ff5a5a;   /* 相手 */
+    --elixir:     #d24ce0;
+
+    --ink:        #ffffff;
+    --ink-dim:    #a9c0ea;
+    --shadow:     rgba(3, 10, 28, 0.55);
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  /* スマホでの二度タップ拡大を無効にする。
+     ピンチでの拡大は残るので、見づらい時は指2本で広げられる。
+     タップ後の300ms待ちも消えるので、ボタンの反応も速くなる。 */
+  html { touch-action: manipulation; }
+  /* hidden を付けた要素は、display を指定していても必ず隠す */
+  [hidden] { display: none !important; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--ink);
+    font-family: 'M PLUS Rounded 1c', system-ui, sans-serif;
+    font-weight: 500;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -5%, #2b5fbf 0%, transparent 60%),
+      repeating-linear-gradient(115deg,
+        rgba(255,255,255,0.022) 0px, rgba(255,255,255,0.022) 2px,
+        transparent 2px, transparent 16px),
+      linear-gradient(180deg, #0d2352 0%, var(--arena-deep) 55%);
+    background-attachment: fixed;
+  }
+
+  /* ノッチ・ステータスバーの下に潜らないよう、端末ごとの安全領域ぶん空ける */
+  .wrap {
+    max-width: 540px; margin: 0 auto;
+    padding: max(14px, calc(env(safe-area-inset-top) + 8px))
+             max(12px, env(safe-area-inset-right))
+             90px
+             max(12px, env(safe-area-inset-left));
+  }
+
+  /* ---- 見出し ---- */
+  .display { font-family: 'Mochiy Pop One', sans-serif; font-weight: 400; }
+  .outlined {
+    color: var(--ink);
+    text-shadow:
+      -1.5px -1.5px 0 #08183c, 1.5px -1.5px 0 #08183c,
+      -1.5px  1.5px 0 #08183c, 1.5px  1.5px 0 #08183c,
+       0 3px 0 rgba(4,12,32,0.5);
+  }
+
+  .masthead {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; margin-bottom: 14px;
+  }
+  .crest {
+    font-family: 'Mochiy Pop One', sans-serif; font-size: 17px; letter-spacing: 0.02em;
+    background: linear-gradient(180deg, var(--gold-lite), var(--gold) 45%, var(--gold-deep));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 2px 0 rgba(4,12,32,0.6));
+  }
+
+  /* ---- クラロワ風ボタン(下に厚みのある立体) ---- */
+  .cr-btn {
+    font-family: 'M PLUS Rounded 1c', sans-serif; font-weight: 800; font-size: 12px;
+    color: var(--ink); cursor: pointer;
+    background: linear-gradient(180deg, var(--arena-lite), var(--arena-mid));
+    border: 2px solid var(--panel-edge);
+    border-bottom-width: 4px; border-radius: 11px;
+    padding: 7px 14px; white-space: nowrap;
+    text-shadow: 0 1.5px 0 rgba(4,12,32,0.6);
+    transition: transform 0.06s, border-bottom-width 0.06s;
+  }
+  .cr-btn:active { transform: translateY(2px); border-bottom-width: 2px; }
+  .cr-btn.on {
+    background: linear-gradient(180deg, var(--gold-lite), var(--gold) 50%, #e6a400);
+    border-color: var(--gold-deep); color: #3d2600;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+  }
+  .cr-btn:focus-visible { outline: 3px solid var(--gold-lite); outline-offset: 2px; }
+
+  .masthead-btns { display: flex; gap: 6px; flex-shrink: 0; }
+  .cr-btn.icon { padding: 6px 10px; font-size: 15px; line-height: 1.2; text-decoration: none; display: inline-block; }
+
+  /* ---- プロフィール ---- */
+  .pf {
+    margin-bottom: 12px; padding: 14px 14px 16px; border-radius: 16px;
+    background: linear-gradient(180deg, rgba(44,94,190,0.92), rgba(13,40,96,0.92));
+    border: 2px solid var(--panel-edge); border-bottom-width: 4px;
+  }
+  .pf h3 { margin: 0 0 4px; font-family: 'Mochiy Pop One', sans-serif; font-weight: 400; font-size: 14px; color: var(--gold-lite); }
+  .pf .note { margin: 0 0 10px; font-size: 10.5px; color: var(--ink-dim); line-height: 1.6; }
+  .pf input, .pf select {
+    width: 100%; padding: 10px 11px; font: inherit; font-size: 16px; color: var(--ink);
+    background: rgba(6,16,40,0.65); border: 2px solid rgba(120,170,240,0.4); border-radius: 10px;
+  }
+  .pf input:focus, .pf select:focus { outline: none; border-color: var(--gold); }
+  .pf-row { display: flex; gap: 8px; align-items: center; }
+  .pf-row input { flex: 1; min-width: 0; }
+  .pf .go { flex-shrink: 0; padding: 9px 14px; }
+  .pf .go.gold, .pf .go.gold:active {
+    background: linear-gradient(180deg, var(--gold-lite), var(--gold) 50%, #e6a400);
+    border-color: var(--gold-deep); color: #3d2600; text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+  }
+  .pf .err { margin: 8px 0 0; font-size: 11px; color: #ff9b9b; line-height: 1.6; min-height: 0; }
+  .pf .ok { margin: 8px 0 0; font-size: 11px; color: #7ee08a; }
+  .acc {
+    display: flex; align-items: center; gap: 9px; padding: 9px 10px; margin-bottom: 7px; border-radius: 11px;
+    background: rgba(6,16,40,0.45); border: 1px solid rgba(120,170,240,0.25);
+  }
+  .acc-role {
+    flex-shrink: 0; font-size: 9.5px; font-weight: 800; padding: 3px 6px; border-radius: 6px;
+    color: var(--ink-dim); background: rgba(120,170,240,0.18);
+  }
+  .acc-role.main { color: #3d2600; background: linear-gradient(180deg, var(--gold-lite), var(--gold)); }
+  .acc-body { flex: 1; min-width: 0; }
+  .acc-body b { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .acc-body small { font-size: 10px; color: var(--ink-dim); }
+  .acc-btns { display: flex; gap: 5px; flex-shrink: 0; }
+  .acc-btns .cr-btn { padding: 5px 8px; font-size: 10.5px; }
+  .pf .card-ask { display: flex; align-items: center; gap: 12px; margin: 10px 0 4px; padding: 10px;
+    background: rgba(6,16,40,0.45); border: 1px solid rgba(120,170,240,0.3); border-radius: 12px; }
+  .pf .card-ask img { width: 64px; flex-shrink: 0; border-radius: 8px; }
+  .pf .card-ask p { margin: 0; font-size: 12px; line-height: 1.7; }
+  .pf .card-ask b { color: var(--gold-lite); }
+  .pf-me { display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--ink-dim); }
+  .pf-me img { width: 32px; height: 32px; border-radius: 50%; }
+  .pf-me button { margin-left: auto; }
+
+  /* 選手ページのアカウント切り替え */
+  .acc-switch { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .acc-switch .cr-btn { padding: 5px 10px; font-size: 10.5px; }
+  .banner-sub { font-size: 11px; color: var(--ink-dim); margin-top: 2px; }
+
+  /* スパーキー欄 */
+  .lede {
+    background: rgba(6,16,40,0.4);
+    border: 1px solid rgba(120,170,240,0.25); border-radius: 11px;
+    padding: 9px 11px; margin-bottom: 12px;
+    font-size: 10.5px; color: var(--ink-dim); line-height: 1.7;
+  }
+  .lede b { color: var(--gold-lite); }
+  .usage-bar {
+    display: block; height: 3px; border-radius: 2px; margin-top: 4px;
+    background: rgba(255,255,255,0.12); overflow: hidden;
+  }
+  .usage-bar span { display: block; height: 100%; background: var(--elixir); }
+
+  .tab-rail { display: flex; gap: 7px; overflow-x: auto; margin-bottom: 16px; padding: 2px 0 5px; }
+  .tab-rail.sub { margin-bottom: 6px; }
+  .tab-rail.sub:last-child { margin-bottom: 14px; }
+  .tab-rail::-webkit-scrollbar { display: none; }
+  .tab-rail .cr-btn { flex: 0 0 auto; }
+
+  /* ---- 順位プレート ---- */
+  .plate {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    background: linear-gradient(180deg, rgba(35,79,163,0.92), rgba(16,44,102,0.92));
+    border: 2px solid rgba(96,150,235,0.5); border-bottom-width: 4px;
+    border-radius: 14px; padding: 9px 12px 9px 8px; margin-bottom: 8px;
+    cursor: pointer; text-align: left; color: inherit;
+    font-family: inherit;
+    transition: transform 0.06s;
+  }
+  .plate:active { transform: translateY(2px); }
+  .plate.gold   { border-color: var(--gold); box-shadow: 0 0 22px -6px rgba(255,210,63,0.55); }
+  .plate.silver { border-color: #cdd8ec; }
+  .plate.bronze { border-color: #d08a4a; }
+
+  .medal {
+    width: 30px; height: 30px; flex-shrink: 0; border-radius: 50%;
+    display: grid; place-items: center;
+    font-family: 'Mochiy Pop One', sans-serif; font-size: 14px;
+    background: linear-gradient(180deg, #2a5cb8, #16336e);
+    border: 2px solid rgba(120,170,240,0.45); color: var(--ink-dim);
+  }
+  .gold .medal   { background: linear-gradient(180deg, var(--gold-lite), #e0a300); border-color: #8a5c00; color: #4a2f00; }
+  .silver .medal { background: linear-gradient(180deg, #ffffff, #b9c6dc); border-color: #8593ad; color: #33405a; }
+  .bronze .medal { background: linear-gradient(180deg, #f0b183, #b96a2c); border-color: #7d4413; color: #40200a; }
+
+  .shield { width: 38px; height: 38px; flex-shrink: 0; display: grid; place-items: center; }
+  .shield img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 2px 3px var(--shadow)); }
+  .shield-none {
+    width: 32px; height: 32px; border-radius: 9px;
+    background: linear-gradient(180deg, #2c5aa8, #16336e);
+    border: 2px solid rgba(120,170,240,0.4);
+    display: grid; place-items: center; font-size: 11px; color: var(--ink-dim);
+  }
+
+  .plate-body { flex: 1; min-width: 0; }
+  .plate-name {
+    display: block;
+    font-weight: 800; font-size: 14px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+    text-shadow: 0 1.5px 0 rgba(4,12,32,0.55);
+  }
+  .plate-sub { display: block; font-size: 10.5px; color: var(--ink-dim); margin-top: 1px; }
+  /* ---- 称号(見た目は /titles.css。称号ラボと同じ部品) ---- */
+  .plate-titles { display: flex; align-items: center; gap: 4px; margin: 0 0 3px; min-width: 0; }
+  .plate-titles.bottom { margin: 3px 0 0; }
+  .plate-titles .ttl { height: 17px; font-size: 9px; }
+  .plate-titles .ttl svg { width: 11px; height: 11px; }
+  .plate-titles .bz { --h: 17px; font-size: 9px; }
+  .title-row { display: flex; justify-content: center; margin: 10px 0 4px; }
+  .title-row.under { margin: 8px 0 2px; }
+  /* 選手ページ: 持っている称号の棚 */
+  .shelf-btn { margin-top: 10px; }
+  .title-shelf { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 6px; margin-top: 10px; }
+  /* プロフィール: 称号えらび */
+  .t-preview { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin: 4px 0 12px;
+               border-radius: 12px; background: rgba(6,16,40,0.45); border: 1px solid rgba(120,170,240,0.3); }
+  .t-preview .plate-name { font-size: 14px; }
+  .t-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+  .t-choices { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tchoice {
+    display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 5px 8px;
+    border-radius: 10px; cursor: pointer; font: inherit; font-size: 11px; font-weight: 800; color: var(--ink-dim);
+    background: rgba(6,16,40,0.5); border: 2px solid rgba(120,170,240,0.25);
+  }
+  .tchoice.on { border-color: var(--gold); color: var(--gold-lite); background: rgba(255,210,63,0.1); }
+  .t-label { font-size: 11px; font-weight: 800; color: var(--ink-dim); margin: 12px 0 6px; }
+  .t-cat { font-size: 11px; font-weight: 800; color: var(--gold-lite); margin: 12px 0 6px; }
+  .t-cat-list { display: grid; gap: 6px; }
+  .t-item { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .t-item small { font-size: 10px; color: var(--ink-dim); }
+  .t-item.locked .ttl, .t-item.locked .bz { filter: grayscale(1) brightness(0.55); opacity: 0.7; }
+  .t-rar { font-size: 9px; font-weight: 800; padding: 2px 5px; border-radius: 5px; background: rgba(6,16,40,0.6);
+           color: var(--ink-dim); border: 1px solid rgba(120,170,240,0.3); }
+  .pf select, .pf input { min-width: 0; }
+  .pf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+
+  .plate-value {
+    flex-shrink: 0; text-align: right;
+    font-family: 'Mochiy Pop One', sans-serif; font-size: 20px; color: var(--gold);
+    text-shadow: 0 2px 0 rgba(4,12,32,0.55);
+  }
+  .plate-value.text { font-size: 12px; color: var(--gold-lite); max-width: 92px; line-height: 1.3; }
+  .plate-value.none { color: #6d84ad; font-size: 13px; }
+  .plate-value u { text-decoration: none; font-size: 11px; }
+
+  /* ---- 選手バナー ---- */
+  .banner {
+    position: relative; text-align: center; padding: 20px 16px 18px; margin-bottom: 14px;
+    background: linear-gradient(180deg, rgba(44,94,190,0.95), rgba(13,40,96,0.95));
+    border: 3px solid var(--gold-deep); border-radius: 18px;
+    box-shadow: inset 0 2px 0 rgba(255,255,255,0.18), 0 6px 0 rgba(4,12,32,0.35);
+  }
+  .banner::before {
+    content: ""; position: absolute; inset: 5px; border-radius: 13px;
+    border: 1px solid rgba(255,226,140,0.28); pointer-events: none;
+  }
+  .banner-name { font-family: 'Mochiy Pop One', sans-serif; font-size: 16px; }
+  .banner-clan { font-size: 11px; color: var(--ink-dim); margin-top: 3px; }
+  .banner-shield { width: 76px; height: 76px; margin: 10px auto 4px; }
+  .banner-shield img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 4px 6px var(--shadow)); }
+  .banner-league { font-family: 'Mochiy Pop One', sans-serif; font-size: 13px; color: var(--gold-lite); }
+
+  .plaque {
+    display: inline-flex; align-items: baseline; gap: 7px; margin-top: 9px;
+    padding: 6px 18px; border-radius: 999px;
+    background: linear-gradient(180deg, #10285c, #061733);
+    border: 2px solid var(--gold-deep);
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.5);
+  }
+  .plaque-label { font-size: 10px; color: var(--ink-dim); letter-spacing: 0.08em; }
+  .plaque-num { font-family: 'Mochiy Pop One', sans-serif; font-size: 30px; color: var(--gold); line-height: 1; }
+  .banner-foot { font-size: 10.5px; color: var(--ink-dim); margin-top: 8px; }
+  .season-row { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .season-chip { display: inline-flex; align-items: baseline; gap: 5px; padding: 4px 8px; border-radius: 8px;
+                 font-family: 'Mochiy Pop One', sans-serif; font-size: 13px; color: var(--gold);
+                 background: rgba(6,16,40,0.45); border: 1px solid rgba(120,170,240,0.3); }
+  .season-chip i, .season-chip small { font-family: 'M PLUS Rounded 1c', sans-serif; font-style: normal;
+                 font-size: 9.5px; font-weight: 800; color: var(--ink-dim); }
+
+  /* ---- 数値タイル ---- */
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-bottom: 8px; }
+  .tile {
+    background: linear-gradient(180deg, rgba(30,70,150,0.85), rgba(12,34,80,0.85));
+    border: 2px solid rgba(96,150,235,0.35); border-bottom-width: 3px;
+    border-radius: 11px; padding: 8px 6px; text-align: center;
+  }
+  .tile-num { font-family: 'Mochiy Pop One', sans-serif; font-size: 17px; line-height: 1.1; }
+  .tile-num u { text-decoration: none; font-size: 10px; opacity: 0.8; }
+  .tile-cap { font-size: 9.5px; color: var(--ink-dim); margin-top: 2px; }
+
+  /* ---- 推移グラフ ---- */
+  .graph {
+    background: linear-gradient(180deg, rgba(20,50,115,0.85), rgba(9,26,62,0.85));
+    border: 2px solid rgba(96,150,235,0.3); border-radius: 13px;
+    padding: 12px 12px 8px; margin: 12px 0 16px;
+  }
+  .graph-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .graph-title { font-family: 'Mochiy Pop One', sans-serif; font-size: 11px; color: var(--ink-dim); }
+  .graph-span { font-size: 11px; color: var(--gold-lite); }
+  svg.spark { display: block; width: 100%; height: 104px; overflow: visible; }
+
+  /* ---- セクション見出し ---- */
+  .sect {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 16px 2px 9px;
+  }
+  .sect-title { font-family: 'Mochiy Pop One', sans-serif; font-size: 13px; }
+  .sect-note { font-size: 11px; color: var(--ink-dim); }
+
+  /* ---- 対戦結果 ---- */
+  .bout {
+    border-radius: 13px; margin-bottom: 8px; overflow: hidden;
+    border: 2px solid rgba(96,150,235,0.3); border-bottom-width: 3px;
+    background: linear-gradient(180deg, rgba(26,62,135,0.85), rgba(11,30,72,0.85));
+  }
+  .bout.win  { border-left: 5px solid var(--blue-side); }
+  .bout.lose { border-left: 5px solid var(--red-side); }
+  .bout.draw { border-left: 5px solid #8a97b5; }
+
+  .bout-face {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 9px 11px; background: none; border: 0; color: inherit;
+    font-family: inherit; cursor: pointer; text-align: left;
+  }
+  .verdict {
+    font-family: 'Mochiy Pop One', sans-serif; font-size: 12px; width: 46px; flex-shrink: 0;
+  }
+  .win  .verdict { color: var(--blue-side); }
+  .lose .verdict { color: var(--red-side); }
+  .draw .verdict { color: #9fb0d0; }
+
+  .crowns { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .crown-set { display: flex; gap: 2px; }
+  .crown-set svg { width: 13px; height: 11px; }
+  .crown-on.me  { fill: var(--blue-side); }
+  .crown-on.opp { fill: var(--red-side); }
+  .crown-off { fill: rgba(255,255,255,0.16); }
+
+  .bout-body { flex: 1; min-width: 0; }
+  .bout-vs {
+    font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-weight: 700;
+  }
+  .bout-meta { font-size: 10px; color: var(--ink-dim); margin-top: 2px; }
+  .delta { font-weight: 800; }
+  .delta.up { color: #7ee08a; }
+  .delta.down { color: var(--red-side); }
+  .chevron { flex-shrink: 0; color: var(--ink-dim); font-size: 11px; transition: transform 0.18s; }
+  .bout.open .chevron { transform: rotate(180deg); }
+
+  /* ---- デッキ ---- */
+  .decks { padding: 2px 11px 12px; }
+  .deck-side { margin-top: 10px; }
+  .deck-head {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 10.5px; margin-bottom: 6px;
+  }
+  .deck-who { font-weight: 800; }
+  .deck-who.me  { color: var(--blue-side); }
+  .deck-who.opp { color: var(--red-side); }
+  .avg { display: inline-flex; align-items: center; gap: 3px; color: var(--ink-dim); }
+  .avg svg { width: 10px; height: 13px; fill: var(--elixir); }
+
+  .deck-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+  .card-slot { position: relative; border-radius: 7px; overflow: hidden; background: rgba(0,0,0,0.22); }
+  .card-slot img { display: block; width: 100%; aspect-ratio: 302/363; object-fit: cover; }
+  .card-lv {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    font-size: 8.5px; font-weight: 800; text-align: center; padding: 1px 0;
+    background: rgba(6,16,40,0.82); color: var(--ink-dim);
+  }
+  .card-lv.max {
+    background: linear-gradient(180deg, var(--gold), #d99a00);
+    color: #3d2600; letter-spacing: 0.04em;
+  }
+  .card-slot.evo { box-shadow: 0 0 0 2px #b04cff inset; }
+
+  /* 左3枠の役割 */
+  .card-slot.role-0 { box-shadow: 0 0 0 2px rgba(176,76,255,0.55) inset; }
+  .card-slot.role-1 { box-shadow: 0 0 0 2px rgba(255,168,56,0.7) inset; }
+  .card-slot.role-2 { box-shadow: 0 0 0 2px rgba(216,122,190,0.6) inset; }
+  .card-slot.role-0.evo, .card-slot.role-2.evo { box-shadow: 0 0 0 2px #b04cff inset; }
+  .role-tag {
+    position: absolute; top: 2px; right: 2px;
+    font-size: 7.5px; font-weight: 800; line-height: 1;
+    padding: 2px 3px; border-radius: 4px;
+    background: rgba(6,16,40,0.82); color: var(--ink-dim);
+  }
+  .role-0 .role-tag { color: #d79bff; }
+  .role-1 .role-tag { color: #ffc27a; }
+  .role-2 .role-tag { color: #f0a8d8; }
+
+  .chaos-box {
+    margin-top: 9px; padding: 8px 9px;
+    background: rgba(6,16,40,0.45);
+    border: 1px solid rgba(120,170,240,0.28); border-radius: 10px;
+  }
+  .chaos-cap {
+    font-size: 9px; font-weight: 800; letter-spacing: 0.1em;
+    color: var(--ink-dim); margin-bottom: 6px;
+    display: flex; align-items: baseline; gap: 7px;
+  }
+  .chaos-cap span { font-weight: 500; letter-spacing: 0; font-size: 9px; opacity: 0.75; }
+  .chaos-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chaos-chip {
+    position: relative;
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 3px; border-radius: 8px;
+    font-size: 10px; font-weight: 700;
+    border: 2px solid transparent;
+  }
+  .chaos-chip img { display: block; width: 34px; aspect-ratio: 302/363; object-fit: cover; border-radius: 5px; }
+  .chaos-chip b { font-weight: 700; padding: 4px 6px 4px 4px; }
+  .chaos-chip i {
+    position: absolute; right: -2px; bottom: -2px;
+    font-style: normal; font-weight: 800; font-size: 9.5px; line-height: 1;
+    min-width: 14px; text-align: center;
+    padding: 2px 3px; border-radius: 5px;
+    background: #0a1c42; border: 1px solid currentColor;
+  }
+  /* 段階の色。カードのレアリティ配色に合わせる */
+  .chaos-chip.lv1 { background: rgba(74,157,255,0.18);  border-color: #4a9dff; color: #9dc9ff; }
+  .chaos-chip.lv2 { background: rgba(255,159,61,0.18);  border-color: #ff9f3d; color: #ffc48a; }
+  .chaos-chip.lv3 { background: rgba(176,76,255,0.18);  border-color: #b04cff; color: #d79bff; }
+  /* 後から同じ対象を取って上書きされたもの */
+  .chaos-chip.dead { opacity: 0.35; }
+  .chaos-chip.dead img { filter: grayscale(0.7); }
+  .chaos-chip.dead::after {
+    content: ""; position: absolute; left: 2px; right: 2px; top: 50%;
+    height: 2px; background: currentColor; transform: rotate(-16deg);
+  }
+
+  .deck-empty { font-size: 10.5px; color: var(--ink-dim); padding: 6px 0; }
+
+  /* デッキをクラロワにコピーするボタン */
+  .deck-tools { display: inline-flex; align-items: center; gap: 8px; }
+  .copy-btn {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-family: inherit; font-size: 10px; font-weight: 800; line-height: 1;
+    color: #3d2600; text-decoration: none; white-space: nowrap;
+    background: linear-gradient(180deg, var(--gold-lite), var(--gold) 55%, #e6a400);
+    border: 1.5px solid var(--gold-deep); border-bottom-width: 3px;
+    border-radius: 8px; padding: 4px 8px;
+  }
+  .copy-btn:active { transform: translateY(1px); border-bottom-width: 1.5px; }
+  .copy-btn svg { width: 10px; height: 10px; fill: currentColor; }
+
+  /* よく当たるデッキ */
+  .mu {
+    background: linear-gradient(180deg, rgba(26,62,135,0.85), rgba(11,30,72,0.85));
+    border: 2px solid rgba(96,150,235,0.3); border-bottom-width: 3px;
+    border-radius: 12px; padding: 8px 9px 9px; margin-bottom: 8px;
+  }
+  .mu-head { display: flex; align-items: center; gap: 8px; font-size: 11px; margin-bottom: 6px; }
+  .mu-rank {
+    width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
+    display: grid; place-items: center; font-size: 11px;
+    background: rgba(6,16,40,0.6); color: var(--gold);
+  }
+  .mu-count { font-weight: 800; color: var(--ink); }
+  .mu-record { color: var(--ink-dim); flex: 1; }
+  .mu-record.good { color: #7ee08a; }
+  .mu-record.bad  { color: var(--red-side); }
+  .mu-deck { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; }
+  .mu-card { border-radius: 4px; overflow: hidden; background: rgba(0,0,0,0.22); }
+  .mu-card img { display: block; width: 100%; aspect-ratio: 302/363; object-fit: cover; }
+
+  /* カード別 */
+  .cs-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+  .cs {
+    background: linear-gradient(180deg, rgba(26,62,135,0.85), rgba(11,30,72,0.85));
+    border: 2px solid rgba(96,150,235,0.3); border-bottom-width: 3px;
+    border-radius: 10px; padding: 5px 5px 6px; text-align: center;
+  }
+  .cs-img { position: relative; border-radius: 6px; overflow: hidden; background: rgba(0,0,0,0.22); }
+  .cs-img img { display: block; width: 100%; aspect-ratio: 302/363; object-fit: cover; }
+  .cs-share {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    font-size: 9px; font-weight: 800; padding: 1px 0;
+    background: rgba(6,16,40,0.82); color: var(--gold-lite);
+  }
+  .cs-count { font-size: 11px; font-weight: 800; margin-top: 4px; }
+  .cs-rate { font-size: 9.5px; color: var(--ink-dim); }
+  .cs-rate.good { color: #7ee08a; }
+  .cs-rate.bad  { color: var(--red-side); }
+  .cs-note { font-size: 9.5px; color: var(--ink-dim); margin: 7px 2px 0; line-height: 1.5; }
+
+  .support-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .support-cap { font-size: 9.5px; color: var(--ink-dim); flex-shrink: 0; }
+  .support-grid { display: flex; gap: 5px; }
+  .support-grid .card-slot { width: 46px; }
+
+  /* ---- その他 ---- */
+  .more {
+    width: 100%; margin-top: 4px; padding: 11px;
+    font-family: inherit; font-weight: 700; font-size: 12px; color: var(--ink-dim);
+    background: rgba(20,48,110,0.7); border: 2px dashed rgba(96,150,235,0.35);
+    border-radius: 12px; cursor: pointer;
+  }
+  .more:active { transform: translateY(1px); }
+
+  .notice { text-align: center; padding: 46px 18px; color: var(--ink-dim); font-size: 13px; line-height: 1.9; }
+  .notice b { color: var(--gold-lite); }
+
+  .refresh {
+    position: fixed; bottom: max(20px, env(safe-area-inset-bottom)); right: 50%;
+    transform: translateX(268px);
+    width: 52px; height: 52px; border-radius: 50%; cursor: pointer; font-size: 21px;
+    color: #3d2600;
+    background: linear-gradient(180deg, var(--gold-lite), var(--gold) 50%, #e0a300);
+    border: 3px solid var(--gold-deep); border-bottom-width: 5px;
+    box-shadow: 0 5px 16px rgba(0,0,0,0.45);
+  }
+  @media (max-width: 590px) { .refresh { right: 16px; transform: none; } }
+  .refresh:active { transform: translateY(2px); border-bottom-width: 3px; }
+  @media (max-width: 590px) { .refresh:active { transform: translateY(2px); } }
+  /* ---- ログイン・登録 ---- */
+  .auth {
+    max-width: 380px; margin: 18px auto 0; padding: 22px 18px 20px;
+    background: linear-gradient(180deg, rgba(44,94,190,0.95), rgba(13,40,96,0.95));
+    border: 3px solid var(--gold-deep); border-radius: 18px;
+    box-shadow: inset 0 2px 0 rgba(255,255,255,0.18), 0 6px 0 rgba(4,12,32,0.35);
+  }
+  .auth h2 { margin: 0 0 4px; text-align: center; font-family: 'Mochiy Pop One', sans-serif; font-size: 17px; color: var(--gold-lite); }
+  .auth .lede { margin: 0 0 16px; text-align: center; font-size: 11.5px; color: var(--ink-dim); line-height: 1.7; }
+  .auth label { display: block; font-size: 11px; font-weight: 800; color: var(--ink-dim); margin: 12px 0 5px; }
+  .auth input {
+    width: 100%; box-sizing: border-box; padding: 11px 12px;
+    font: inherit; font-size: 16px; color: var(--ink);
+    background: rgba(6,16,40,0.65); border: 2px solid rgba(120,170,240,0.4); border-radius: 11px;
+  }
+  .auth input:focus { outline: none; border-color: var(--gold); }
+  .auth .go { width: 100%; margin-top: 18px; padding: 12px; font-size: 14px; }
+  .auth .go.gold {
+    background: linear-gradient(180deg, var(--gold-lite), var(--gold) 50%, #e6a400);
+    border-color: var(--gold-deep); color: #3d2600; text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+  }
+  .auth .err { min-height: 1em; margin: 10px 0 0; font-size: 11.5px; color: #ff9b9b; text-align: center; line-height: 1.6; }
+  .auth .switch {
+    display: block; width: 100%; margin-top: 14px; background: none; border: 0;
+    font: inherit; font-size: 11.5px; color: var(--gold-lite); text-decoration: underline; cursor: pointer;
+  }
+  .auth .card-ask { display: flex; align-items: center; gap: 12px; margin: 6px 0 4px; padding: 10px;
+    background: rgba(6,16,40,0.45); border: 1px solid rgba(120,170,240,0.3); border-radius: 12px; }
+  .auth .card-ask img { width: 64px; flex-shrink: 0; border-radius: 8px; }
+  .auth .card-ask p { margin: 0; font-size: 12px; line-height: 1.7; }
+  .auth .card-ask b { color: var(--gold-lite); }
+  .discord-btn {
+    display: flex; align-items: center; justify-content: center; gap: 9px;
+    margin-top: 16px; padding: 13px; border-radius: 12px;
+    font-family: 'M PLUS Rounded 1c', sans-serif; font-weight: 800; font-size: 15px;
+    color: #fff; text-decoration: none; background: #5865f2;
+    border: 2px solid #3c45c4; border-bottom-width: 4px;
+  }
+  .discord-btn:active { transform: translateY(2px); border-bottom-width: 2px; }
+  .discord-btn svg { width: 22px; height: 22px; fill: #fff; }
+  .auth .fine { margin: 14px 0 0; font-size: 10.5px; color: var(--ink-dim); line-height: 1.7; text-align: center; }
+  .whoami { font-size: 10.5px; color: var(--ink-dim); margin-top: 6px; padding-left: 3px; }
+  .whoami button { background: none; border: 0; padding: 0; font: inherit; color: var(--gold-lite); text-decoration: underline; cursor: pointer; }
+  .refresh.busy { animation: turn 0.9s linear infinite; }
+  @keyframes turn { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .refresh.busy { animation: none; } }
+
+  /* ---- グループランキング ---- */
+  .google-btn { background: #fff !important; color: #1f1f1f !important; border-color: #dadce0 !important; }
+  .google-btn svg { width: 20px; height: 20px; }
+  .grp { display: flex; align-items: center; gap: 10px; width: 100%; margin-bottom: 8px; padding: 13px 14px; cursor: pointer;
+         font: inherit; color: var(--ink); text-align: left; border-radius: 14px;
+         background: linear-gradient(180deg, rgba(35,79,163,0.92), rgba(16,44,102,0.92)); border: 2px solid rgba(96,150,235,0.5); border-bottom-width: 4px; }
+  .grp-body { flex: 1; min-width: 0; }
+  .grp-body b { display: block; font-family: 'Mochiy Pop One', sans-serif; font-weight: 400; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .grp-body small { display: block; font-size: 11px; color: var(--ink-dim); margin-top: 3px; }
+  .grp .chev { font-size: 20px; }
+  .grp-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 12px; }
+  .grp-name { font-family: 'Mochiy Pop One', sans-serif; font-size: 18px; color: var(--gold-lite); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .grp-head .cr-btn { flex-shrink: 0; font-size: 12px; padding: 6px 12px; }
+  .home-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
+  .home-btns .cr-btn.on { color: #3d2600; text-shadow: none; background: linear-gradient(180deg, var(--gold-lite), var(--gold)); border-color: var(--gold-deep); }
+  .code-box { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(6,16,40,0.5); border: 1px solid rgba(120,170,240,0.3); }
+  .code-box span { font-size: 11px; color: var(--ink-dim); }
+  .code-box b { flex: 1; font-family: 'Mochiy Pop One', sans-serif; font-weight: 400; font-size: 20px; letter-spacing: 0.08em; color: var(--gold); }
+  .mem { padding: 10px 0; border-bottom: 1px solid rgba(120,170,240,0.2); }
+  .mem:last-child { border-bottom: 0; }
+  .mem-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .mem-head b { font-size: 14px; }
+  .mem-role { font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 5px; color: #3d2600; background: var(--gold); }
+  .mem-head .acc-btns { margin-left: auto; }
+  .mem-acc { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; margin: 5px 0 0 36px; }
+  .mem-acc small { color: var(--ink-dim); }
+  .mem-acc em { font-style: normal; color: #ff9a9a; font-size: 10.5px; }
+  .hidden-acc span { opacity: 0.6; }
+  .cr-btn.mini { font-size: 10.5px; padding: 3px 8px; border-bottom-width: 2px; }
+  .cr-btn.danger { color: #ffd0d0; border-color: #a33; background: linear-gradient(180deg, #7a1d1d, #4a0f0f); }
+  .hint-box { border-color: var(--gold) !important; font-size: 13px; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="masthead">
+    <span class="crest display" id="crest">GROUP RANKING</span>
+    <span class="masthead-btns">
+      <a class="cr-btn icon" id="nav-home" href="/" aria-label="トップへ" title="トップへ">🏠</a>
+      <button class="cr-btn icon" id="nav-groups" aria-label="グループ一覧" title="グループ一覧">👥</button>
+      <button class="cr-btn icon" id="nav-profile" aria-label="マイページ" title="マイページ">👤</button>
+      <button class="cr-btn" id="back" hidden>← 戻る</button>
+    </span>
+  </div>
+  <div id="tabs" class="tab-rail" hidden></div>
+  <div id="main"></div>
+</div>
+
+<button id="refresh" class="refresh" aria-label="更新">⟳</button>
+
+<script src="/titles.js"></script>
+<script>
+// ---- データの場所 ----
+// グループのランキングは /api/app/groups/<ID>/board、アカウントごとの戦績は /api/data/<タグ>/... から読む。
+// ログインは Google。誰でも使える(グループに入るにはパスワードか招待リンクが要る)
+
+async function loadData(path) {
+  const res = await fetch(`/api/data/${path}?t=${Date.now()}`, { cache: "no-store" });
+  if (res.status === 401) { showAuth(); throw new Error("401"); }
+  if (!res.ok) throw new Error(String(res.status));
+  return await res.json();
+}
+
+// ---- ログイン ----
+let currentUser = null;      // { id, name, avatar, friendCode, admin }
+let me = null;               // /api/app/me の中身(アカウント・グループ・友達・招待・称号)
+
+async function api(path, body) {
+  const res = await fetch(path, {
+    method: body === undefined ? "GET" : "POST",
+    headers: { "content-type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    cache: "no-store",
+  });
+  let data = {};
+  try { data = await res.json(); } catch {}
+  if (res.status === 401) { showAuth(); throw new Error("ログインしてください"); }
+  if (!res.ok) throw new Error(data.error || `エラー (${res.status})`);
+  return data;
+}
+
+// Google から戻ってきたときの理由(?login=...)
+const LOGIN_MESSAGES = {
+  cancel: "ログインをキャンセルしました。",
+  expired: "時間がたちすぎたので、もう一度ログインしてください。",
+  error: "Google とのやり取りに失敗しました。少し待ってからもう一度試してください。",
+};
+const GOOGLE_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5a5.6 5.6 0 0 1-2.4 3.6v3h3.9c2.3-2.1 3.5-5.2 3.5-8.8z"/><path fill="#34A853" d="M12 24c3.2 0 6-1.1 7.9-2.9l-3.9-3c-1.1.7-2.4 1.2-4 1.2-3.1 0-5.7-2.1-6.6-4.9h-4v3.1A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.4 14.4a7.2 7.2 0 0 1 0-4.7V6.6h-4a12 12 0 0 0 0 10.9z"/><path fill="#EA4335" d="M12 4.8c1.7 0 3.3.6 4.5 1.8l3.4-3.4A12 12 0 0 0 1.4 6.6l4 3.1C6.3 6.9 8.9 4.8 12 4.8z"/></svg>`;
+
+function showAuth(reason) {
+  view = "auth";
+  $tabs.hidden = true; $back.hidden = true; $navGroups.hidden = true; $navProfile.hidden = true; $refresh.hidden = true;
+  $crest.textContent = "GROUP RANKING";
+  const msg = LOGIN_MESSAGES[reason] || "";
+  const next = location.pathname + location.search.replace(/[?&]login=[^&]*/, "");
+  $main.innerHTML = `<div class="auth">
+    <h2>グループランキング</h2>
+    <p class="lede">友達やクランの仲間とグループを作って、<br><b>自分たちだけのランキング</b>が作れます</p>
+    <a class="discord-btn google-btn" href="/api/google/login?next=${encodeURIComponent(next || "/app/")}">${GOOGLE_ICON}Google でログイン</a>
+    <p class="err">${esc(msg)}</p>
+    <p class="fine">Google の名前・アイコン・メールアドレスだけを使います(メールアドレスはほかの人には見えません)。<br>一度ログインすると30日はそのまま入れます。無料です。</p>
+  </div>`;
+}
+
+async function logout() {
+  try { await api("/api/logout", {}); } catch {}
+  currentUser = null; me = null; index = null;
+  showAuth();
+}
+
+// ---- リーグ ----
+// leagueNumber 1〜3 がマスターI〜III、4〜6 が神々の挑戦I〜III、7 が天界。
+const LEAGUES = {
+  1: "マスターI", 2: "マスターII", 3: "マスターIII",
+  4: "神々の挑戦I", 5: "神々の挑戦II", 6: "神々の挑戦III",
+  7: "天界",
+};
+const TENKAI = 7; // 天界のリーグ番号。ここに乗るとレートが付く
+
+const LEAGUE_FILES = {
+  1: "icon_League_Badge_Master_1.png",
+  2: "icon_League_Badge_Master_2.png",
+  3: "icon_League_Badge_Master_3.png",
+  4: "icon_League_Badge_Champion.png",
+  5: "icon_League_Badge_Grand_Champion.png",
+  6: "icon_League_Badge_Royal_Champion.png",
+  7: "icon_League_Badge_Ultimate_Champion.png",
+};
+const LEAGUE_IMG = (n) => `/assets/leagues/${LEAGUE_FILES[n]}`;
+
+const PAGE = 20;
+
+// レート推移グラフの期間
+// よく当たるデッキを数える対象(直近の試合数)
+const MATCHUP_RANGES = [50, 100];
+const MATCHUP_MIN = 2;       // 何回以上当たったら「よく当たる」とするか
+
+// 主軸(勝ち筋)のカード。APIには区分が無いので手で持たせている。
+// 名前はAPIが返す英語名。新カードが出たらここに足せばよい。
+const WIN_CONDITIONS = new Set([
+  "Hog Rider", "Royal Giant", "Giant", "Golem", "Lava Hound", "Balloon",
+  "X-Bow", "Mortar", "Graveyard", "Miner", "Goblin Barrel", "Ram Rider",
+  "Battle Ram", "Royal Hogs", "Elixir Golem", "Electro Giant", "Goblin Giant",
+  "Giant Skeleton", "Three Musketeers", "Sparky", "Wall Breakers",
+  "Skeleton Barrel", "Goblin Drill", "Mega Knight", "P.E.K.K.A",
+  "Royal Recruits", "Rocket",
+]);
+
+// スペルは カードID が 28 で始まる(APIの決まり)。
+// IDが無いデータのための予備として名前でも持っておく。
+const SPELL_NAMES = new Set([
+  "Fireball", "Zap", "Arrows", "The Log", "Poison", "Rocket", "Lightning",
+  "Freeze", "Rage", "Mirror", "Clone", "Tornado", "Earthquake",
+  "Barbarian Barrel", "Giant Snowball", "Royal Delivery", "Graveyard",
+  "Goblin Barrel", "Void", "Goblin Curse",
+]);
+const isSpell = (c) => typeof c.id === "number"
+  ? String(c.id).startsWith("28")
+  : SPELL_NAMES.has(c.name);
+const isWinCondition = (c) => WIN_CONDITIONS.has(c.name);
+
+// よく当たるデッキの表示切替
+const MATCHUP_VIEWS = [
+  { id: "deck",  label: "デッキ" },
+  { id: "win",   label: "主軸" },
+  { id: "spell", label: "スペル" },
+];
+
+const CHART_RANGES = [
+  { id: "d1", label: "1日", days: 1 },
+  { id: "d7", label: "1週間", days: 7 },
+  { id: "all", label: "シーズン", days: null },
+];
+
+// ---- カードのレベル ----
+// APIが返す level はレアリティ内での相対値(ノーマルもチャンピオンも1始まり)。
+// 実際の表示レベルは開始レベルぶんだけ上にずれる。
+//   ノーマル1〜 / レア3〜 / スーパーレア6〜 / ウルトラレア9〜 / チャンピオン11〜
+// これは maxLevel から逆算できる (カンストは全レアリティ共通で16)。
+//   例: レアは maxLevel=14 なので +2 して 3〜16 になる
+const MAX_LEVEL = 16;
+function cardLevel(c) {
+  if (typeof c.level !== "number") return null;
+  const max = typeof c.maxLevel === "number" ? c.maxLevel : MAX_LEVEL;
+  return Math.min(MAX_LEVEL, c.level + (MAX_LEVEL - max));
+}
+
+// ---- デッキの特殊スロット ----
+// 左上から順に役割が決まっている。
+//   1枠目: 進化 / 2枠目: ヒーロー / 3枠目: 進化とヒーローどちらでも置けるワイルド
+// 4枠目より右は普通のカード。
+const SLOT_ROLES = ["進化", "ヒーロー", "ワイルド"];
+// 進化を置けるのは1枠目とワイルドの3枠目
+const EVO_SLOTS = [0, 2];
+
+// ---- カオスリーグの特殊能力 ----
+// 試合データの modifiers に "Wizard3" のような形で入っている(対象＋段階)。
+// データは新しいものが先に並んでいるので、取った順にするには逆にする。
+// 同じ対象を複数回取ると後のものが有効になるが、取った順番も見たいので
+// 上書きされた分も「効果なし」として残す。
+const normName = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+function chaosList(battle, tag) {
+  const raws = [];
+  for (const entry of battle?.modifiers || []) {
+    if (clean(entry.tag) !== clean(tag)) continue;
+    for (const raw of entry.modifiers || []) {
+      const m = String(raw).match(/^(.*?)(\d+)$/);
+      if (m) raws.push({ name: m[1], key: normName(m[1]), level: Number(m[2]) });
+    }
+  }
+  raws.reverse(); // 取った順(古い→新しい)に並べ直す
+
+  // 同じ対象で後から取ったものがあれば、前のものは上書きされている
+  return raws.map((item, i) => ({
+    ...item,
+    overwritten: raws.some((other, j) => j > i && other.key === item.key),
+  }));
+}
+
+// 段階ごとの色 (カードのレアリティ配色に合わせる)
+const CHAOS_COLORS = { 1: "lv1", 2: "lv2", 3: "lv3" };
+
+let index = null, metricId = "rank", view = "board", groupFilter = "ALL";
+// Discord アカウントとゲームアカウントの結びつき(プロフィールで登録したもの)
+let roster = { users: [] };
+let selectedTag = null, history = [], trophyLog = [], shown = PAGE;
+let chartRange = "all";
+let matchupRange = 50;
+let matchupView = "deck";
+const opened = new Set();  // 展開中の試合・デッキ
+
+const $main = document.getElementById("main");
+const $tabs = document.getElementById("tabs");
+const $refresh = document.getElementById("refresh");
+const $back = document.getElementById("back");
+const $navGroups = document.getElementById("nav-groups");
+const $navProfile = document.getElementById("nav-profile");
+const $navHome = document.getElementById("nav-home");
+const $crest = document.getElementById("crest");
+
+const clean = (t) => (t || "").trim().toUpperCase().replace(/^#/, "");
+const bust = (u) => `${u}?t=${Date.now()}`;
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+const leagueName = (n) => n == null ? "未参加" : (LEAGUES[n] || `リーグ${n}`);
+const isTenkai = (p) => p.leagueNumber === TENKAI;
+
+function battleTime(raw) {
+  if (!raw) return null;
+  const d = new Date(raw.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2}).*$/, "$1-$2-$3T$4:$5:$6Z"));
+  return isNaN(d.getTime()) ? null : d;
+}
+function ago(iso) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const m = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (m < 1) return "たった今";
+  if (m < 60) return m + "分前";
+  const h = Math.floor(m / 60);
+  return h < 24 ? h + "時間前" : Math.floor(h / 24) + "日前";
+}
+
+const CROWN = `<svg viewBox="0 0 20 16" aria-hidden="true"><path d="M1.6 14.4V4.2l4.4 3.3L10 1.2l4 6.3 4.4-3.3v10.2z"/></svg>`;
+const DROP = `<svg viewBox="0 0 10 13" aria-hidden="true"><path d="M5 0C5 0 0 5.6 0 8.6A5 5 0 0 0 10 8.6C10 5.6 5 0 5 0z"/></svg>`;
+
+// ---- 達成バッジ ----
+// collect.py の ACHIEVEMENTS で決めた目標(CRL 20勝チャレンジなど)を達成した人に付く
+// ---- 称号 ----
+// 称号は人(Discord)に付く。自動の称号は、その人のアカウントの earned を合わせたもの。
+// 管理人が付けたもの(ユニーク)は roster の grants。上下に何を付けるかは roster の equip。
+// まだ登録されていないアカウントは、そのアカウントの称号だけで「おまかせ」表示。
+const playerOf = (tag) => (index?.players || []).find(x => clean(x.tag) === clean(tag));
+
+function ownedOf(user, p) {
+  const tags = user ? (user.accounts || []).map(a => a.tag) : [p?.tag];
+  const map = new Map();
+  for (const t of tags) for (const e of playerOf(t)?.earned || []) if (e?.id && !map.has(e.id)) map.set(e.id, e);
+  for (const g of user?.grants || []) map.set(g.id, g);
+  // まだ誰も登録していないアカウントに管理人が付けた称号
+  if (!user) for (const g of roster.tagGrants?.[clean(p?.tag)] || []) map.set(g.id, g);
+  return [...map.values()];
+}
+
+// レアな順に並べる
+const byRarity = (list) => list.map(e => Titles.resolve(e)).filter(Boolean)
+  .sort((a, b) => (b.rank - a.rank) || ((b.order ?? 99) - (a.order ?? 99)));
+
+// 1つの枠に付ける称号。v は "auto"(おまかせ) / null(なし) / {id, shape}
+function pickTitle(owned, v, slot) {
+  if (v === null) return null;
+  const item = v && v !== "auto" ? owned.find(e => e.id === v.id) : null;
+  if (item) {
+    const t = Titles.resolve(item);
+    return t && { ...t, shape: t.fixedShape || v.shape || "rect" };
+  }
+  if (slot === "bottom") return null;                 // 下のおまかせ = なし
+  const t = Titles.best(owned);                       // 上のおまかせ = 一番レアな称号
+  return t && { ...t, shape: t.fixedShape || "rect" };
+}
+
+function equippedOf(user, p) {
+  const owned = ownedOf(user, p);
+  const eq = user?.equip || {};
+  const val = (slot) => (slot in eq ? eq[slot] : "auto");
+  return { top: pickTitle(owned, val("top"), "top"), bottom: pickTitle(owned, val("bottom"), "bottom"), owned };
+}
+const titleHtml = (t, big) => t ? Titles.html(t, { big }) : "";
+
+// ---- デッキコピー ----
+// クラロワ公式のデッキ共有リンク。開くとゲームが起動してデッキがコピーされる。
+// 並びはそのまま渡すので、進化・ヒーロー枠の位置も保たれる。
+const COPY_ICON = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1h8a2 2 0 0 1 2 2v8h-2V3H5zM1 5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2z"/></svg>`;
+function deckCopyUrl(cards, support) {
+  const ids = (cards || []).map(c => c.id).filter(n => typeof n === "number");
+  if (ids.length !== 8) return null;            // 8枚揃っていないものは出さない
+  const tower = (support || []).find(c => typeof c.id === "number");
+  const q = `deck=${ids.join(";")}&l=Royals${tower ? `&tt=${tower.id}` : ""}`;
+  return `https://link.clashroyale.com/en/?clashroyale://copyDeck?${q}`;
+}
+function copyBtn(cards, support) {
+  const url = deckCopyUrl(cards, support);
+  return url
+    ? `<a class="copy-btn" href="${esc(url)}" target="_blank" rel="noopener">${COPY_ICON}コピー</a>`
+    : "";
+}
+
+function crownRow(count, who) {
+  let out = "";
+  for (let i = 0; i < 3; i++) {
+    const on = i < count;
+    out += CROWN.replace("<svg", `<svg class="${on ? "crown-on " + who : "crown-off"}"`);
+  }
+  return `<span class="crown-set">${out}</span>`;
+}
+
+function shieldHtml(n, cls) {
+  if (n == null || !LEAGUE_FILES[n]) {
+    return `<div class="${cls}"><div class="shield-none">${n == null ? "–" : esc(n)}</div></div>`;
+  }
+  const fb = `<div class=&quot;shield-none&quot;>${n}</div>`;
+  return `<div class="${cls}"><img src="${LEAGUE_IMG(n)}" alt="${esc(leagueName(n))}"
+    onerror="this.parentNode.innerHTML='${fb}'"></div>`;
+}
+
+// ---- ランキング項目 ----
+// 「順位」は天界ならレート、それ以外はリーグの高さで並べる。
+// 天界(7)が最上位なので、リーグ番号→レートの順に見れば自然に並ぶ。
+const rateOf = (p) => (p.rating != null ? p.rating : -1);
+const leagueOf = (p) => (p.leagueNumber != null ? p.leagueNumber : -1);
+
+const METRICS = [
+  {
+    id: "rank", label: "順位",
+    cmp: (a, b) => (leagueOf(b) - leagueOf(a)) || (rateOf(b) - rateOf(a)),
+    has: (p) => p.leagueNumber != null,
+    show: (p) => isTenkai(p) && p.rating != null
+      ? `${p.rating}`
+      : `<span class="text">${esc(leagueName(p.leagueNumber))}</span>`,
+    wide: (p) => !(isTenkai(p) && p.rating != null),
+    sub: (p) => isTenkai(p) ? "天界" : (p.rating != null ? `レート ${p.rating}` : "レート未取得"),
+  },
+  {
+    id: "today", label: "今日の試合",
+    cmp: (a, b) => (b.periods?.today?.battles ?? 0) - (a.periods?.today?.battles ?? 0),
+    has: () => true,
+    show: (p) => `${p.periods?.today?.battles ?? 0}<u>戦</u>`,
+    sub: (p) => rateLine(p.periods?.today),
+  },
+  {
+    id: "d3", label: "3日の試合",
+    cmp: (a, b) => (b.periods?.d3?.battles ?? 0) - (a.periods?.d3?.battles ?? 0),
+    has: () => true,
+    show: (p) => `${p.periods?.d3?.battles ?? 0}<u>戦</u>`,
+    sub: (p) => rateLine(p.periods?.d3),
+  },
+  {
+    id: "d3w", label: "3日の勝率",
+    cmp: (a, b) => (b.periods?.d3?.winRate ?? -1) - (a.periods?.d3?.winRate ?? -1),
+    has: (p) => p.periods?.d3?.winRate != null,
+    show: (p) => p.periods?.d3?.winRate != null ? `${p.periods.d3.winRate}<u>%</u>` : "—",
+    sub: (p) => `${p.periods?.d3?.battles ?? 0}戦`,
+  },
+  streakMetric("d3w-s", "3日の連勝", "d3", "maxWinStreak"),
+  streakMetric("d3l-s", "3日の連敗", "d3", "maxLoseStreak"),
+  {
+    id: "d7", label: "7日の試合",
+    cmp: (a, b) => (b.periods?.d7?.battles ?? 0) - (a.periods?.d7?.battles ?? 0),
+    has: () => true,
+    show: (p) => `${p.periods?.d7?.battles ?? 0}<u>戦</u>`,
+    sub: (p) => rateLine(p.periods?.d7),
+  },
+  {
+    id: "d7w", label: "7日の勝率",
+    cmp: (a, b) => (b.periods?.d7?.winRate ?? -1) - (a.periods?.d7?.winRate ?? -1),
+    has: (p) => p.periods?.d7?.winRate != null,
+    show: (p) => p.periods?.d7?.winRate != null ? `${p.periods.d7.winRate}<u>%</u>` : "—",
+    sub: (p) => `${p.periods?.d7?.battles ?? 0}戦`,
+  },
+  streakMetric("d7w-s", "7日の連勝", "d7", "maxWinStreak"),
+  streakMetric("d7l-s", "7日の連敗", "d7", "maxLoseStreak"),
+];
+
+// 期間中の最大連勝・最大連敗。多い順に並べる
+function streakMetric(id, label, period, field) {
+  const val = (p) => p.periods?.[period]?.[field];
+  return {
+    id, label,
+    cmp: (a, b) => (val(b) ?? -1) - (val(a) ?? -1),
+    has: (p) => typeof val(p) === "number" && (p.periods?.[period]?.battles ?? 0) > 0,
+    show: (p) => `${val(p)}<u>${field === "maxWinStreak" ? "連勝" : "連敗"}</u>`,
+    sub: (p) => {
+      const d = p.periods?.[period];
+      return d ? `${d.battles}戦 · ${d.wins}勝${d.losses ?? (d.battles - d.wins)}敗` : "0戦";
+    },
+  };
+}
+
+function rateLine(d) {
+  if (!d || d.winRate == null) return `${d?.battles ?? 0}戦`;
+  return `${d.battles}戦 · 勝率 ${d.winRate}%`;
+}
+
+// ---- 読み込み ----
+// 開いているグループのランキング。メンバーと称号は今の情報、戦績は10分ごとの集計
+let groupId = null, groupInfo = null;
+
+async function loadBoard() {
+  if (!groupId) return openHome();
+  $refresh.classList.add("busy");
+  try {
+    const d = await api(`/api/app/groups/${groupId}/board`);
+    groupInfo = d.group;
+    index = { players: d.players || [], updatedAt: d.updatedAt, challengeYear: d.challengeYear, groups: [] };
+    roster = { users: d.users || [] };
+    draw();
+  } catch (e) {
+    if (view === "auth") return;
+    $tabs.hidden = true;
+    $main.innerHTML = `<div class="notice">${esc(e.message)}</div>`;
+  } finally {
+    $refresh.classList.remove("busy");
+  }
+}
+
+// recent.json はカードの共通情報(名前・画像・コスト)を1か所にまとめて軽くしてある。
+// 画面ではカードごとに全部入っている方が扱いやすいので、読み込んだら元の形に戻す。
+// 昔の形式(試合の配列そのまま)もそのまま使える。
+function unpackRecent(data) {
+  if (Array.isArray(data)) return data;
+  if (!data || !Array.isArray(data.battles)) return [];
+  const cards = data.cards || {};
+  const fill = (list) => (list || []).map(c => ({ ...(cards[String(c.id)] || {}), ...c }));
+  return data.battles.map(b => {
+    const side = (players) => (players || []).map(pl => ({
+      ...pl,
+      ...(pl.cards ? { cards: fill(pl.cards) } : {}),
+      ...(pl.supportCards ? { supportCards: fill(pl.supportCards) } : {}),
+    }));
+    return { ...b, team: side(b.team), opponent: side(b.opponent) };
+  });
+}
+
+async function openPlayer(tag) {
+  selectedTag = tag; view = "player"; shown = PAGE;
+  history = []; trophyLog = []; opened.clear();
+  draw();
+  const [h, t] = await Promise.all([
+    loadData(`${tag}/recent.json`).catch(() => []),
+    loadData(`${tag}/trophies.json`).catch(() => []),
+  ]);
+  if (selectedTag !== tag) return;
+  if (!(index?.players || []).some(x => clean(x.tag) === clean(tag))) {
+    const one = await loadData(`${tag}/player.json`).catch(() => null);
+    if (one) index = { ...(index || { groups: [] }), players: [...(index?.players || []), one] };
+  }
+  history = unpackRecent(h);
+  trophyLog = Array.isArray(t) ? t : [];
+  draw();
+}
+
+// ---- 順位表 ----
+// その人の所属グループ。複数所属に対応(古い単数形式も読める)
+function groupsOf(p) {
+  if (Array.isArray(p.groups)) return p.groups;
+  return p.group ? [p.group] : [];
+}
+
+function drawTabs() {
+  $tabs.hidden = view !== "board";
+  if (view !== "board") return;
+
+  // 登録した人にグループが付いていれば、絞り込みのタブも出す
+  const groups = index?.groups || [];
+  const groupRail = groups.length > 1
+    ? `<div class="tab-rail sub">
+        <button class="cr-btn${groupFilter === "ALL" ? " on" : ""}" data-group="ALL">全員</button>
+        ${groups.map(g =>
+          `<button class="cr-btn${groupFilter === g ? " on" : ""}" data-group="${esc(g)}">${esc(g)}</button>`
+        ).join("")}
+      </div>`
+    : "";
+
+  $tabs.innerHTML = `
+    ${groupRail}
+    <div class="tab-rail sub">${METRICS.map(m =>
+      `<button class="cr-btn${m.id === metricId ? " on" : ""}" data-id="${m.id}">${esc(m.label)}</button>`
+    ).join("")}</div>`;
+
+  $tabs.querySelectorAll("[data-group]").forEach(b => {
+    b.onclick = () => { groupFilter = b.dataset.group; draw(); };
+  });
+  $tabs.querySelectorAll("[data-id]").forEach(b => {
+    b.onclick = () => { metricId = b.dataset.id; draw(); };
+  });
+}
+
+// 順位表に出す行。プロフィールでアカウントを登録した人は1人1行にまとめ、
+// 一番上のアカウント(リーグ → レートの順。同じならメイン)を表示名で出す。
+// まだ誰にも登録されていないアカウントは今まで通り1行ずつ。
+function userOfTag(tag) {
+  return (roster.users || []).find(u => (u.accounts || []).some(a => clean(a.tag) === clean(tag))) || null;
+}
+function boardEntries() {
+  const byTag = new Map((index?.players || []).map(p => [clean(p.tag), p]));
+  const claimed = new Set();
+  const out = [];
+  for (const u of roster.users || []) {
+    const accs = (u.accounts || []).map(a => {
+      claimed.add(clean(a.tag));
+      return { acc: a, p: byTag.get(clean(a.tag)) };
+    });
+    const name = u.displayName || accs[0]?.acc.name || "?";
+    const have = accs.filter(x => x.p);
+    if (!have.length) {                       // 登録したばかりで、まだ集計されていない
+      out.push({ tag: accs[0]?.acc.tag || "", label: name, name, pending: true, _user: u });
+      continue;
+    }
+    have.sort((x, y) => (leagueOf(y.p) - leagueOf(x.p)) || (rateOf(y.p) - rateOf(x.p))
+      || ((y.acc.role === "main") - (x.acc.role === "main")));
+    out.push({ ...have[0].p, label: name, _user: u });
+  }
+  for (const p of index?.players || []) if (!claimed.has(clean(p.tag))) out.push(p);
+  return out;
+}
+
+function drawBoard() {
+  const m = METRICS.find(x => x.id === metricId) || METRICS[0];
+  const pool = boardEntries().filter(p =>
+    groupFilter === "ALL" || groupsOf(p).includes(groupFilter));
+
+  const list = [...pool].sort((a, b) => {
+    const ha = m.has(a), hb = m.has(b);
+    if (ha !== hb) return ha ? -1 : 1;   // データ無しは末尾へ
+    return m.cmp(a, b);
+  });
+
+  const rows = list.map((p, i) => {
+    const ok = m.has(p);
+    const rankCls = ok && i === 0 ? " gold" : ok && i === 1 ? " silver" : ok && i === 2 ? " bronze" : "";
+    const wide = m.wide && m.wide(p) ? " text" : "";
+    const eq = equippedOf(p._user || null, p);
+    return `<button class="plate${rankCls}" data-tag="${esc(clean(p.tag))}">
+      <span class="medal display">${i + 1}</span>
+      ${shieldHtml(p.leagueNumber, "shield")}
+      <span class="plate-body">
+        ${eq.top ? `<span class="plate-titles">${titleHtml(eq.top)}</span>` : ""}
+        <span class="plate-name">${esc(p.label || p.name)}</span>
+        <span class="plate-sub">${esc(m.sub(p))}${
+          groupFilter === "ALL" && groupsOf(p).length
+            ? ` · ${esc(groupsOf(p).join("/"))}` : ""}</span>
+        ${eq.bottom ? `<span class="plate-titles bottom">${titleHtml(eq.bottom)}</span>` : ""}
+      </span>
+      <span class="plate-value${ok ? wide : " none"}">${ok ? m.show(p) : "—"}</span>
+    </button>`;
+  }).join("");
+
+  const empty = groupFilter === "ALL"
+    ? `<div class="notice">まだランキングに出る人がいません。<br>メンバーが👤マイページでクラロワのアカウントを登録すると、<br>10分ほどでここに出ます。</div>`
+    : `<div class="notice"><b>${esc(groupFilter)}</b>に登録された人がいません。</div>`;
+
+  $main.innerHTML = groupHeader() + (rows || empty) +
+    (index?.updatedAt ? `<div class="sect"><span class="sect-note">最終更新 ${esc(ago(index.updatedAt))}</span></div>` : "") +
+    (currentUser ? `<div class="whoami">${esc(currentUser.name)} でログイン中 · <button id="logout">ログアウト</button></div>` : "");
+
+  $main.querySelectorAll(".plate").forEach(b => { b.onclick = () => openPlayer(b.dataset.tag); });
+  bindGroupHeader();
+  const $logout = document.getElementById("logout");
+  if ($logout) $logout.onclick = () => logout();
+}
+
+// ---- 推移グラフ ----
+function spark(points) {
+  if (points.length < 2) return "";
+  const W = 100, H = 104, pad = 7;
+  const xs = points.map(p => p.t), ys = points.map(p => p.v);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  const y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const sx = x1 - x0 || 1, sy = y1 - y0 || 1;
+  const pts = points.map(p => [((p.t - x0) / sx) * W, H - pad - ((p.v - y0) / sy) * (H - pad * 2)]);
+  const d = pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(2)},${y.toFixed(2)}`).join(" ");
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="推移">
+    <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffd23f" stop-opacity="0.34"/>
+      <stop offset="100%" stop-color="#ffd23f" stop-opacity="0"/>
+    </linearGradient></defs>
+    <path d="${d} L${W},${H} L0,${H} Z" fill="url(#g)"/>
+    <path d="${d}" fill="none" stroke="#ffd23f" stroke-width="1.6"
+      vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`;
+}
+
+// ---- デッキ ----
+function cardSlot(c, opts = {}) {
+  const { evo = false, role, roleIndex } = opts;
+  const url = (evo && c.iconUrls?.evolutionMedium) || c.iconUrls?.medium || "";
+  const lv = cardLevel(c);
+  const maxed = lv === MAX_LEVEL;
+  const roleCls = role ? ` role role-${roleIndex}` : "";
+  return `<div class="card-slot${evo ? " evo" : ""}${roleCls}">
+    ${url ? `<img src="${esc(url)}" alt="${esc(c.name || "")}" loading="lazy">` : ""}
+    ${role ? `<span class="role-tag">${esc(role)}</span>` : ""}
+    ${lv != null ? `<span class="card-lv${maxed ? " max" : ""}">${maxed ? "MAX" : "Lv" + lv}</span>` : ""}
+  </div>`;
+}
+
+function chaosBox(entries, player) {
+  if (!entries || !entries.length) return "";
+
+  // 能力の対象がデッキ内のカードなら、その画像を使う。
+  // (試合データにカード画像のURLが入っているので追加の素材はいらない)
+  const icons = {};
+  for (const c of [...(player?.cards || []), ...(player?.supportCards || [])]) {
+    const key = normName(c.name);
+    if (key && !icons[key]) icons[key] = c.iconUrls?.medium || "";
+  }
+
+  const chips = entries.map(e => {
+    const img = icons[e.key];
+    const inner = img
+      ? `<img src="${esc(img)}" alt="${esc(e.name)}" loading="lazy">`
+      : `<b>${esc(e.name)}</b>`;
+    return `<span class="chaos-chip ${CHAOS_COLORS[e.level] || ""}${e.overwritten ? " dead" : ""}"
+      title="${esc(e.name)} ${e.level}">
+      ${inner}<i>${e.level}</i>
+    </span>`;
+  }).join("");
+
+  return `<div class="chaos-box">
+    <div class="chaos-cap">CHAOS MODIFIER<span>取った順 →</span></div>
+    <div class="chaos-chips">${chips}</div>
+  </div>`;
+}
+
+function deckHtml(player, who, chaos) {
+  const cards = player?.cards || [];
+  // タワーユニットとヒーローは cards ではなく supportCards に入る
+  const support = player?.supportCards || [];
+  if (!cards.length && !support.length) return `<div class="deck-empty">デッキ情報なし</div>`;
+
+  const costs = cards.map(c => c.elixirCost).filter(v => typeof v === "number");
+  const avg = costs.length ? (costs.reduce((a, b) => a + b, 0) / costs.length).toFixed(1) : null;
+
+  // 進化が乗るのは1枠目とワイルドの3枠目だけ。データに進化の印がある時のみ光らせる
+  const slots = cards.map((c, i) => cardSlot(c, {
+    evo: EVO_SLOTS.includes(i) && c.evolutionLevel != null,
+    role: SLOT_ROLES[i],
+    roleIndex: i,
+  })).join("");
+
+  const supportSlots = support.map(c => cardSlot(c, {})).join("");
+
+  return `
+    <div class="deck-head">
+      <span class="deck-who ${who}">${who === "me" ? "自分" : esc(player.name || "相手")}</span>
+      <span class="deck-tools">
+        ${avg ? `<span class="avg">${DROP} 平均 ${avg}</span>` : ""}
+        ${copyBtn(cards, support)}
+      </span>
+    </div>
+    ${cards.length ? `<div class="deck-grid">${slots}</div>` : ""}
+    ${support.length ? `<div class="support-row">
+      <span class="support-cap">タワー</span>
+      <div class="support-grid">${supportSlots}</div>
+    </div>` : ""}
+    ${chaosBox(chaos, player)}`;
+}
+
+// ---- よく当たるデッキ ----
+// 相手のデッキをカード8枚の組み合わせで数える。
+// 並び順は人によって違うので、名前を並べ替えたものを同じデッキの目印にする。
+function frequentDecks(battles, tag, limit) {
+  const map = new Map();
+  for (const b of battles.slice(0, limit)) {
+    const opp = (b.opponent || [])[0];
+    const cards = opp?.cards || [];
+    if (cards.length < 8) continue;          // 2v2などデッキが揃っていないものは除く
+    const key = cards.map(c => c.name).sort().join("|");
+    const me = (b.team || []).find(x => clean(x.tag) === tag) || (b.team || [])[0] || {};
+    const mc = me.crowns ?? 0, oc = opp.crowns ?? 0;
+    let e = map.get(key);
+    if (!e) { e = { cards, support: opp.supportCards || [], count: 0, win: 0, lose: 0 }; map.set(key, e); }
+    e.count++;
+    if (mc > oc) e.win++;
+    else if (mc < oc) e.lose++;
+  }
+  return [...map.values()]
+    .filter(e => e.count >= MATCHUP_MIN)
+    .sort((a, b) => b.count - a.count || b.lose - a.lose);
+}
+
+// カード単位で数える。1試合に同じカードは1回と数える。
+function frequentCards(battles, tag, limit, pick) {
+  const map = new Map();
+  let total = 0;
+  for (const b of battles.slice(0, limit)) {
+    const opp = (b.opponent || [])[0];
+    const cards = opp?.cards || [];
+    if (cards.length < 8) continue;
+    total++;
+    const me = (b.team || []).find(x => clean(x.tag) === tag) || (b.team || [])[0] || {};
+    const mc = me.crowns ?? 0, oc = opp.crowns ?? 0;
+    const seen = new Set();
+    for (const c of cards) {
+      if (!pick(c) || seen.has(c.name)) continue;
+      seen.add(c.name);
+      let e = map.get(c.name);
+      if (!e) { e = { card: c, count: 0, win: 0, lose: 0 }; map.set(c.name, e); }
+      e.count++;
+      if (mc > oc) e.win++;
+      else if (mc < oc) e.lose++;
+    }
+  }
+  const list = [...map.values()]
+    .sort((a, b) => b.count - a.count || b.lose - a.lose);
+  return { list, total };
+}
+
+function cardStatsHtml(tag, pick, emptyWord) {
+  const { list, total } = frequentCards(history, tag, matchupRange, pick);
+  if (!list.length) {
+    return `<div class="notice" style="padding:22px 8px">直近の対戦に${emptyWord}がありません</div>`;
+  }
+  return `<div class="cs-grid">${list.map(e => {
+    const decided = e.win + e.lose;
+    const rate = decided ? Math.round(e.win / decided * 100) : null;
+    const tone = rate == null ? "" : rate >= 50 ? " good" : " bad";
+    const share = total ? Math.round(e.count / total * 100) : 0;
+    const url = e.card.iconUrls?.medium || "";
+    return `<div class="cs">
+      <div class="cs-img">${url ? `<img src="${esc(url)}" alt="${esc(e.card.name || "")}" loading="lazy">` : ""}
+        <span class="cs-share">${share}%</span></div>
+      <div class="cs-count">${e.count}回</div>
+      <div class="cs-rate${tone}">${rate != null ? `勝率${rate}%` : "—"}</div>
+    </div>`;
+  }).join("")}</div>
+  <div class="cs-note">%は直近${total}試合のうち相手のデッキに入っていた割合。勝率はそのカード相手の自分の勝率</div>`;
+}
+
+function matchupHtml(tag) {
+  const counted = Math.min(matchupRange, history.length);
+  const list = frequentDecks(history, tag, matchupRange);
+
+  const rows = list.map((e, i) => {
+    const decided = e.win + e.lose;
+    const rate = decided ? Math.round(e.win / decided * 100) : null;
+    const tone = rate == null ? "" : rate >= 50 ? " good" : " bad";
+    const costs = e.cards.map(c => c.elixirCost).filter(v => typeof v === "number");
+    const avg = costs.length ? (costs.reduce((a, b) => a + b, 0) / costs.length).toFixed(1) : null;
+    return `<div class="mu">
+      <div class="mu-head">
+        <span class="mu-rank display">${i + 1}</span>
+        <span class="mu-count">${e.count}回</span>
+        <span class="mu-record${tone}">${e.win}勝${e.lose}敗${rate != null ? ` · 勝率${rate}%` : ""}</span>
+        ${avg ? `<span class="avg">${DROP} ${avg}</span>` : ""}
+        ${copyBtn(e.cards, e.support)}
+      </div>
+      <div class="mu-deck">${e.cards.map(c => {
+        const url = c.iconUrls?.medium || "";
+        return `<div class="mu-card">${url ? `<img src="${esc(url)}" alt="${esc(c.name || "")}" loading="lazy">` : ""}</div>`;
+      }).join("")}</div>
+    </div>`;
+  }).join("");
+
+  const deckBody = list.length
+    ? rows
+    : `<div class="notice" style="padding:22px 8px">
+        直近${counted}試合で${MATCHUP_MIN}回以上当たったデッキはありません</div>`;
+
+  let body;
+  if (history.length === 0) {
+    body = `<div class="notice" style="padding:22px 8px">読み込み中…</div>`;
+  } else if (matchupView === "win") {
+    body = cardStatsHtml(tag, isWinCondition, "主軸カード");
+  } else if (matchupView === "spell") {
+    body = cardStatsHtml(tag, isSpell, "スペル");
+  } else {
+    body = deckBody;
+  }
+
+  return `
+    <div class="sect">
+      <span class="sect-title display">よく当たる相手</span>
+      <span class="sect-note">直近${counted}試合</span>
+    </div>
+    <div class="tab-rail sub" style="margin:0 0 6px">${MATCHUP_VIEWS.map(v =>
+      `<button class="cr-btn${v.id === matchupView ? " on" : ""}" data-mv="${v.id}">${esc(v.label)}</button>`
+    ).join("")}</div>
+    <div class="tab-rail sub" style="margin:0 0 10px">${MATCHUP_RANGES.map(n =>
+      `<button class="cr-btn${n === matchupRange ? " on" : ""}" data-mu="${n}">${n}試合</button>`
+    ).join("")}</div>
+    ${body}
+  `;
+}
+
+// ---- 選手ページ ----
+function drawPlayer() {
+  const p = (index?.players || []).find(x => clean(x.tag) === selectedTag);
+  const owner = userOfTag(selectedTag);
+  // 同じ人のほかのアカウントへ切り替えるボタン
+  const accSwitch = owner && owner.accounts.length > 1
+    ? `<div class="acc-switch">${owner.accounts.map(a => {
+        const d = (index?.players || []).find(x => clean(x.tag) === clean(a.tag));
+        return `<button class="cr-btn${clean(a.tag) === selectedTag ? " on" : ""}" data-acc="${esc(clean(a.tag))}">${
+          a.role === "main" ? "メイン" : "サブ"}: ${esc(d?.name || a.name || a.tag)}</button>`;
+      }).join("")}</div>` : "";
+  if (!p) {
+    $main.innerHTML = `<div class="notice">このアカウントはまだ集計されていません。<br>登録してから最大10分ほどで出てきます。</div>${accSwitch}`;
+    bindAccSwitch();
+    return;
+  }
+
+  const eq = equippedOf(owner, p);
+  const shelf = byRarity(eq.owned).map(t => titleHtml({ ...t, shape: t.fixedShape || "rect" })).join("");
+  const per = p.periods || {};
+  const tile = (cap, num, color) =>
+    `<div class="tile"><div class="tile-num" style="color:${color}">${num}</div><div class="tile-cap">${esc(cap)}</div></div>`;
+  const pct = (d) => d?.winRate != null ? `${d.winRate}<u>%</u>` : "—";
+  const streak = (d, f) => typeof d?.[f] === "number" ? d[f] : "—";
+
+  const useRate = p.rating != null;
+  const allPts = [];
+  let prev = null;
+  for (const t of trophyLog) {
+    const v = useRate ? t.rating : t.trophies;
+    if (typeof v !== "number" || v === prev) continue;
+    allPts.push({ t: new Date(t.time).getTime(), v });
+    prev = v;
+  }
+
+  // 期間で絞る。シーズンが変わると推移はリセットされるので、
+  // 「シーズン」は貯まっている全部という意味になる。
+  const rangeDef = CHART_RANGES.find(r => r.id === chartRange) || CHART_RANGES[2];
+  const since = rangeDef.days ? Date.now() - rangeDef.days * 864e5 : 0;
+  let gp = allPts.filter(x => x.t >= since);
+  // 期間の始まりの値が分かるよう、直前の1点も足す
+  if (rangeDef.days) {
+    const before = allPts.filter(x => x.t < since).pop();
+    if (before) gp = [{ ...before, t: since }, ...gp];
+  }
+  gp = gp.slice(-200);
+
+  const span = gp.length > 1 ? `${Math.min(...gp.map(x => x.v))} – ${Math.max(...gp.map(x => x.v))}` : "";
+  const diff = gp.length > 1 ? gp[gp.length - 1].v - gp[0].v : null;
+
+  const bouts = history.slice(0, shown).map((b) => {
+    const key = `${b.battleTime}_${(b.team?.[0]?.tag) || ""}`;
+    const me = (b.team || []).find(x => clean(x.tag) === selectedTag) || (b.team || [])[0] || {};
+    const opp = (b.opponent || [])[0] || {};
+    const mc = me.crowns ?? 0, oc = opp.crowns ?? 0;
+    const cls = mc > oc ? "win" : mc < oc ? "lose" : "draw";
+    const word = mc > oc ? "WIN" : mc < oc ? "LOSE" : "DRAW";
+    const ch = me.trophyChange;
+    const when = battleTime(b.battleTime);
+    const isOpen = opened.has(key);
+
+    return `<div class="bout ${cls}${isOpen ? " open" : ""}">
+      <button class="bout-face" data-key="${esc(key)}" aria-expanded="${isOpen}">
+        <span class="verdict">${word}</span>
+        <span class="crowns">${crownRow(mc, "me")}${crownRow(oc, "opp")}</span>
+        <span class="bout-body">
+          <span class="bout-vs">vs ${esc(opp.name || "?")}</span>
+          <span class="bout-meta">
+            ${when ? esc(when.toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })) : ""}
+            ${typeof ch === "number" && ch !== 0
+              ? ` · <span class="delta ${ch > 0 ? "up" : "down"}">${ch > 0 ? "+" + ch : ch}</span>` : ""}
+          </span>
+        </span>
+        <span class="chevron">▼</span>
+      </button>
+      ${isOpen ? `<div class="decks">
+        <div class="deck-side">${deckHtml(me, "me", chaosList(b, me.tag || selectedTag))}</div>
+        <div class="deck-side">${deckHtml(opp, "opp", chaosList(b, opp.tag))}</div>
+      </div>` : ""}
+    </div>`;
+  }).join("");
+
+  $main.innerHTML = `
+    <div class="banner">
+      ${eq.top ? `<div class="title-row">${titleHtml(eq.top, true)}</div>` : ""}
+      <div class="banner-name display outlined">${esc(owner?.displayName || p.name)}</div>
+      ${owner?.displayName && owner.displayName !== p.name ? `<div class="banner-sub">ゲーム内の名前: ${esc(p.name)}</div>` : ""}
+      ${p.clan ? `<div class="banner-clan">${esc(p.clan)}</div>` : ""}
+      ${eq.bottom ? `<div class="title-row under">${titleHtml(eq.bottom, true)}</div>` : ""}
+      ${shelf ? `<button class="cr-btn shelf-btn" id="shelf">持っている称号 ${eq.owned.length}個 ${shelfOpen ? "▲" : "▼"}</button>
+        ${shelfOpen ? `<div class="title-shelf">${shelf}</div>` : ""}` : ""}
+      ${accSwitch}
+      ${shieldHtml(p.leagueNumber, "banner-shield")}
+      <div class="banner-league">${esc(leagueName(p.leagueNumber))}</div>
+      ${useRate
+        ? `<div class="plaque"><span class="plaque-label">レート</span><span class="plaque-num">${esc(p.rating)}</span></div>`
+        : `<div class="plaque"><span class="plaque-label">トロフィー</span><span class="plaque-num">${esc(p.trophies ?? "—")}</span></div>
+           ${peakRate(p) ? "" : `<div class="banner-foot">天界に乗るとレートが出ます</div>`}`}
+      ${pastSeasons(p)}
+    </div>
+
+    <div class="tiles">
+      ${tile("今日", (per.today?.battles ?? 0) + "<u>戦</u>", "var(--gold)")}
+      ${tile("3日", (per.d3?.battles ?? 0) + "<u>戦</u>", "var(--ink)")}
+      ${tile("7日", (per.d7?.battles ?? 0) + "<u>戦</u>", "var(--ink)")}
+      ${tile("記録済み", p.storedBattles ?? history.length, "var(--ink-dim)")}
+    </div>
+    <div class="tiles">
+      ${tile("今日の勝率", pct(per.today), "var(--blue-side)")}
+      ${tile("3日の勝率", pct(per.d3), "var(--blue-side)")}
+      ${tile("7日の勝率", pct(per.d7), "var(--blue-side)")}
+      ${tile("通算試合", p.battleCount ?? "—", "var(--ink-dim)")}
+    </div>
+    <div class="tiles">
+      ${tile("3日の最大連勝", streak(per.d3, "maxWinStreak"), "var(--blue-side)")}
+      ${tile("3日の最大連敗", streak(per.d3, "maxLoseStreak"), "var(--red-side)")}
+      ${tile("7日の最大連勝", streak(per.d7, "maxWinStreak"), "var(--blue-side)")}
+      ${tile("7日の最大連敗", streak(per.d7, "maxLoseStreak"), "var(--red-side)")}
+    </div>
+
+    <div class="graph">
+      <div class="graph-head">
+        <span class="graph-title">${useRate ? "レートの動き" : "トロフィーの動き"}</span>
+        <span class="graph-span">${gp.length > 1 ? esc(span) : ""}${
+          diff != null && diff !== 0
+            ? ` <b style="color:${diff > 0 ? "#7ee08a" : "var(--red-side)"}">${diff > 0 ? "+" + diff : diff}</b>`
+            : ""}</span>
+      </div>
+      <div class="tab-rail sub" style="margin:0 0 8px">${CHART_RANGES.map(r =>
+        `<button class="cr-btn${r.id === chartRange ? " on" : ""}" data-range="${r.id}">${esc(r.label)}</button>`
+      ).join("")}</div>
+      ${gp.length > 1
+        ? spark(gp)
+        : `<div class="notice" style="padding:22px 8px">この期間の動きはまだありません</div>`}
+    </div>
+
+    ${matchupHtml(selectedTag)}
+
+    <div class="sect">
+      <span class="sect-title display">対戦履歴</span>
+      <span class="sect-note">直近${history.length}試合 · タップでデッキ</span>
+    </div>
+
+    ${history.length === 0 ? `<div class="notice">読み込み中…</div>` : bouts}
+    ${shown < history.length ? `<button class="more" id="more">さらに${Math.min(PAGE, history.length - shown)}試合</button>` : ""}
+  `;
+
+  $main.querySelectorAll(".bout-face").forEach(b => {
+    b.onclick = () => {
+      const k = b.dataset.key;
+      opened.has(k) ? opened.delete(k) : opened.add(k);
+      draw();
+    };
+  });
+  $main.querySelectorAll("[data-mv]").forEach(b => {
+    b.onclick = () => { matchupView = b.dataset.mv; draw(); };
+  });
+  $main.querySelectorAll("[data-mu]").forEach(b => {
+    b.onclick = () => { matchupRange = Number(b.dataset.mu); draw(); };
+  });
+  $main.querySelectorAll("[data-range]").forEach(b => {
+    b.onclick = () => { chartRange = b.dataset.range; draw(); };
+  });
+  const more = document.getElementById("more");
+  if (more) more.onclick = () => { shown += PAGE; draw(); };
+  const $shelf = document.getElementById("shelf");
+  if ($shelf) $shelf.onclick = () => { shelfOpen = !shelfOpen; draw(); };
+  bindAccSwitch();
+}
+
+let shelfOpen = false;
+
+// 到達したレートの最高(順位に関係なく)。今のシーズン・前シーズン・最高シーズン・これまでの記録から
+function peakRate(p) {
+  const xs = [p.records?.rating, p.bestRating, p.lastRating, p.rawLeagueNumber === TENKAI ? p.rawRating : null]
+    .filter(v => typeof v === "number" && v > 0);
+  return xs.length ? Math.max(...xs) : null;
+}
+
+// 前シーズンと最高シーズンのレート・世界順位。順位が付いていなくても(圏外)レートは出す
+function pastSeasons(p) {
+  const peak = peakRate(p);
+  const rank = (r) => typeof r === "number" && r > 0 ? `世界${r.toLocaleString()}位` : "順位なし";
+  const row = (label, rate, r) => typeof rate === "number" && rate > 0
+    ? `<span class="season-chip"><i>${label}</i>${esc(rate)}<small>${esc(rank(r))}</small></span>` : "";
+  const chips = row("前シーズン", p.lastRating, p.lastRank) + row("最高シーズン", p.bestRating, p.bestRank);
+  if (!peak && !chips) return "";
+  return `${peak ? `<div class="banner-foot">到達レート最高 <b style="color:var(--gold-lite)">${esc(peak)}</b></div>` : ""}
+    ${chips ? `<div class="season-row">${chips}</div>` : ""}`;
+}
+
+function bindAccSwitch() {
+  $main.querySelectorAll("[data-acc]").forEach(b => { b.onclick = () => openPlayer(b.dataset.acc); });
+}
+
+// ---- マイページ ----
+// 表示名・友達・クラロワのアカウント・称号。管理人ならユニーク称号の欄も
+let profileMsg = { err: "", ok: "" };
+// 称号: 持っている称号と付けている称号 / 編集中の内容 / 管理人の一覧
+let titleData = null, titleEdit = null, titleSlot = "top", titleMsg = { err: "", ok: "" };
+let adminTitles = null, grantForm = { target: "", tag: "", label: "", sub: "", year: "", design: "zap", shape: "" };
+
+function startTitleEdit() {
+  const eq = titleData?.equip || {};
+  titleEdit = { top: "top" in eq ? eq.top : "auto", bottom: "bottom" in eq ? eq.bottom : null };
+}
+
+// 自分の情報を読み直す(どの画面でも使う)
+async function loadMe() {
+  me = await api("/api/app/me");
+  currentUser = me.user;
+  titleData = me.titles;
+  if (!titleEdit) startTitleEdit();
+  return me;
+}
+function useMe(data) {
+  me = data; currentUser = data.user; titleData = data.titles; startTitleEdit();
+}
+
+async function openProfile() {
+  view = "profile"; profileMsg = { err: "", ok: "" }; titleMsg = { err: "", ok: "" };
+  draw();
+  try {
+    await loadMe(); startTitleEdit();
+    adminTitles = me.user.admin ? await api("/api/app/admin/titles") : null;
+  } catch (e) { profileMsg.err = e.message; }
+  if (view === "profile") draw();
+}
+
+const copyText = async (text, el) => {
+  try { await navigator.clipboard.writeText(text); if (el) { const t = el.textContent; el.textContent = "コピーしました"; setTimeout(() => el.textContent = t, 1500); } }
+  catch { prompt("コピーしてください", text); }
+};
+const avatarImg = (u, size = 28) => u?.avatar
+  ? `<img src="${esc(u.avatar)}" alt="" style="width:${size}px;height:${size}px;border-radius:50%;flex-shrink:0" referrerpolicy="no-referrer">` : "";
+
+function drawProfile() {
+  if (!me) {
+    $main.innerHTML = profileMsg.err ? `<div class="notice">${esc(profileMsg.err)}</div>` : `<div class="notice">読み込み中…</div>`;
+    return;
+  }
+  const { user, accounts, friends, friendRequests } = me;
+  const full = accounts.length >= 3;
+  const hasMain = accounts.some(a => a.role === "main");
+  const subs = accounts.filter(a => a.role === "sub").length;
+  const summary = (tag) => null;
+  const accRows = accounts.map(a => `<div class="acc">
+      <span class="acc-role${a.role === "main" ? " main" : ""}">${a.role === "main" ? "メイン" : "サブ"}</span>
+      <span class="acc-body"><b>${esc(a.name || a.tag)}</b><small>#${esc(a.tag)}</small></span>
+      <span class="acc-btns">
+        <button class="cr-btn" data-pl="${esc(a.tag)}">戦績</button>
+        ${a.role === "sub" ? `<button class="cr-btn" data-main="${esc(a.tag)}">メインにする</button>` : ""}
+        <button class="cr-btn" data-remove="${esc(a.tag)}">外す</button>
+      </span>
+    </div>`).join("") || `<p class="note">まだ登録していません。グループのランキングに出るには、ここでアカウントを登録してください。</p>`;
+  const addBox = full ? `<p class="note">メイン1つとサブ2つ、全部登録済みです。</p>` : `<div class="pf-row">
+      <input id="pf-tag" placeholder="#タグ" autocapitalize="characters">
+      ${hasMain ? `<select id="pf-role" style="width:auto">
+        <option value="sub"${subs >= 2 ? " disabled" : ""}>サブ</option><option value="main">メイン</option></select>` : ""}
+      <button class="cr-btn go gold" id="pf-add">追加</button>
+    </div>
+    <p class="note" style="margin:8px 0 0">タグはクラロワのプロフィールで名前の下にある「#」から始まる英数字です。${hasMain ? "メインで追加すると、今のメインはサブになります。" : "最初に登録したアカウントがメインになります。"}</p>`;
+  const userRow = (u, btns) => `<div class="acc">${avatarImg(u)}<span class="acc-body"><b>${esc(u.name)}</b></span><span class="acc-btns">${btns}</span></div>`;
+
+  $main.innerHTML = `
+    <div class="pf">
+      <h3>表示名</h3>
+      <p class="note">グループのランキングに出る名前です。</p>
+      <div class="pf-row">
+        <input id="pf-name" maxlength="16" value="${esc(user.name || "")}">
+        <button class="cr-btn go gold" id="pf-save">保存</button>
+      </div>
+    </div>
+    <div class="pf">
+      <h3>クラロワのアカウント</h3>
+      <p class="note">メイン1つとサブ2つまで。ランキングには、一番リーグ(レート)が高いアカウントが出ます。同じならメインが出ます。</p>
+      ${accRows}
+      <div style="margin-top:10px">${addBox}</div>
+      ${profileMsg.err ? `<p class="err">${esc(profileMsg.err)}</p>` : ""}
+      ${profileMsg.ok ? `<p class="ok">${esc(profileMsg.ok)}</p>` : ""}
+    </div>
+    <div class="pf">
+      <h3>友達</h3>
+      <p class="note">友達になると、自分のグループに招待できます。自分の友達コードを相手に教えるか、相手のコードを入れて申請してください。</p>
+      <div class="code-box"><span>あなたの友達コード</span><b>${esc(user.friendCode)}</b><button class="cr-btn" id="copy-fc">コピー</button></div>
+      <div class="pf-row" style="margin-top:8px">
+        <input id="fr-code" placeholder="相手の友達コード" autocapitalize="characters">
+        <button class="cr-btn go gold" id="fr-send">申請</button>
+      </div>
+      ${friendRequests.incoming.length ? `<div class="t-label">届いた申請</div>${friendRequests.incoming.map(u =>
+        userRow(u, `<button class="cr-btn go gold" data-fr-accept="${esc(u.id)}">承認</button><button class="cr-btn" data-fr-remove="${esc(u.id)}">断る</button>`)).join("")}` : ""}
+      ${friendRequests.outgoing.length ? `<div class="t-label">申請中</div>${friendRequests.outgoing.map(u =>
+        userRow(u, `<button class="cr-btn" data-fr-remove="${esc(u.id)}">取り消す</button>`)).join("")}` : ""}
+      <div class="t-label">友達(${friends.length}人)</div>
+      ${friends.map(u => userRow(u, `<button class="cr-btn" data-fr-remove="${esc(u.id)}" data-confirm="1">外す</button>`)).join("") || `<p class="note">まだいません。</p>`}
+    </div>
+    ${titleBox(user)}
+    ${adminTitles ? grantBox() : ""}
+    <div class="pf pf-me">
+      ${avatarImg(user, 32)}
+      <span>Google: ${esc(user.googleName || "")} でログイン中</span>
+      <button class="cr-btn" id="pf-logout">ログアウト</button>
+    </div>`;
+
+  const run = async (fn, okMsg) => {
+    profileMsg = { err: "", ok: "" };
+    try { useMe(await fn()); profileMsg.ok = okMsg || ""; }
+    catch (e) { profileMsg.err = e.message; }
+    draw();
+  };
+  const $ = (id) => document.getElementById(id);
+  $("pf-save").onclick = () => run(() => api("/api/app/profile", { displayName: $("pf-name").value }), "表示名を保存しました");
+  $("pf-logout").onclick = () => logout();
+  $("copy-fc").onclick = (e) => copyText(user.friendCode, e.target);
+  $("fr-send").onclick = () => run(() => api("/api/app/friends/request", { code: $("fr-code").value }), "申請しました。相手が承認すると友達になります");
+  if ($("pf-add")) $("pf-add").onclick = () => run(
+    () => api("/api/app/accounts/add", { tag: $("pf-tag").value, role: $("pf-role")?.value || "main" }),
+    "登録しました。はじめてのアカウントは、戦績が出るまで最大10分ほどかかります");
+  $main.querySelectorAll("[data-main]").forEach(b => { b.onclick = () => run(() => api("/api/app/accounts/main", { tag: b.dataset.main }), "メインを変更しました"); });
+  $main.querySelectorAll("[data-remove]").forEach(b => {
+    b.onclick = () => { if (confirm("このアカウントを外しますか？")) run(() => api("/api/app/accounts/remove", { tag: b.dataset.remove }), "外しました"); };
+  });
+  $main.querySelectorAll("[data-pl]").forEach(b => { b.onclick = () => openPlayer(b.dataset.pl); });
+  $main.querySelectorAll("[data-fr-accept]").forEach(b => { b.onclick = () => run(() => api("/api/app/friends/accept", { userId: b.dataset.frAccept }), "友達になりました"); });
+  $main.querySelectorAll("[data-fr-remove]").forEach(b => {
+    b.onclick = () => { if (!b.dataset.confirm || confirm("友達から外しますか？")) run(() => api("/api/app/friends/remove", { userId: b.dataset.frRemove })); };
+  });
+  bindTitleBox();
+  bindGrantBox();
+}
+
+// ---- プロフィール: 称号を付ける ----
+// 上(名前の上)と下(名前の下)に1つずつ。形は自由(炎の枠は選べない。管理人が形を決めた称号はその形)
+const USER_SHAPES = Titles.SHAPES.filter(x => x.id !== "blaze");
+
+function titleBox(who) {
+  if (!titleData || !titleEdit) return "";
+  const owned = titleData.owned || [];
+  const list = byRarity(owned);
+  const v = titleEdit[titleSlot];
+  const cur = v && v !== "auto" ? list.find(t => t.id === v.id) : null;
+  const top = pickTitle(owned, titleEdit.top, "top");
+  const bottom = pickTitle(owned, titleEdit.bottom, "bottom");
+
+  const choice = (val, inner, on) => `<button class="tchoice${on ? " on" : ""}" data-tc="${esc(val)}">${inner}</button>`;
+  const choices = [
+    titleSlot === "top" ? choice("auto", "おまかせ(一番レアなもの)", v === "auto") : "",
+    choice("none", "なし", v === null || (titleSlot === "bottom" && v === "auto")),
+    ...list.map(t => choice(t.id, titleHtml({ ...t, shape: t.fixedShape || "rect" }), cur?.id === t.id)),
+  ].join("");
+
+  let shapes = "";
+  if (cur && cur.fixedShape) {
+    shapes = `<p class="note">この称号は形が決まっています。</p>`;
+  } else if (cur) {
+    shapes = `<div class="t-choices">${USER_SHAPES.map(sh =>
+      `<button class="tchoice${(v.shape || "rect") === sh.id ? " on" : ""}" data-tsh="${sh.id}">${
+        titleHtml({ ...cur, shape: sh.id })}</button>`).join("")}</div>`;
+  }
+
+  const have = new Set(owned.map(e => e.id.replace(/^crl20-\d{4}$/, "crl20")));
+  const catalog = Titles.CATS.map(c => `<div class="t-cat">${esc(c.name)}</div><div class="t-cat-list">${
+    Titles.CATALOG.filter(x => x.cat === c.id).map(x => {
+      const r = Titles.RARITY[x.rarity];
+      const shown = { label: x.label, design: r.design };
+      return `<div class="t-item${have.has(x.id) ? "" : " locked"}">${titleHtml(shown)}
+        <span class="t-rar">${esc(r.name)}</span><small>${esc(x.how)}</small></div>`;
+    }).join("")}</div>`).join("");
+
+  return `<div class="pf">
+    <h3>称号</h3>
+    <p class="note">持っている称号を、名前の上と下に1つずつ付けられます。称号はアカウントの成績で自動で付きます(10分ごとに更新)。どのグループでも同じ称号が出ます。</p>
+    <div class="t-preview">
+      <span class="plate-body">
+        ${top ? `<span class="plate-titles">${titleHtml(top)}</span>` : ""}
+        <span class="plate-name">${esc(who?.name || "")}</span>
+        ${bottom ? `<span class="plate-titles bottom">${titleHtml(bottom)}</span>` : ""}
+      </span>
+    </div>
+    <div class="t-tabs">
+      <button class="cr-btn${titleSlot === "top" ? " on" : ""}" data-tslot="top">上の称号</button>
+      <button class="cr-btn${titleSlot === "bottom" ? " on" : ""}" data-tslot="bottom">下の称号</button>
+    </div>
+    ${list.length ? "" : `<p class="note">まだ称号がありません。アカウントを登録すると、成績に合わせて付きます。</p>`}
+    <div class="t-choices">${choices}</div>
+    ${shapes ? `<div class="t-label">形</div>${shapes}` : ""}
+    <div style="margin-top:12px"><button class="cr-btn go gold" id="t-save">この称号で保存</button></div>
+    ${titleMsg.err ? `<p class="err">${esc(titleMsg.err)}</p>` : ""}
+    ${titleMsg.ok ? `<p class="ok">${esc(titleMsg.ok)}</p>` : ""}
+    <details style="margin-top:14px"><summary class="note" style="cursor:pointer">称号の一覧と、付く条件</summary>${catalog}</details>
+  </div>`;
+}
+
+function bindTitleBox() {
+  if (!titleEdit) return;
+  $main.querySelectorAll("[data-tslot]").forEach(b => {
+    b.onclick = () => { titleSlot = b.dataset.tslot; titleMsg = { err: "", ok: "" }; draw(); };
+  });
+  $main.querySelectorAll("[data-tc]").forEach(b => {
+    b.onclick = () => {
+      const val = b.dataset.tc;
+      const old = titleEdit[titleSlot];
+      titleEdit[titleSlot] = val === "auto" ? "auto" : val === "none" ? null
+        : { id: val, shape: (old && old !== "auto" && old.shape) || "rect" };
+      titleMsg = { err: "", ok: "" }; draw();
+    };
+  });
+  $main.querySelectorAll("[data-tsh]").forEach(b => {
+    b.onclick = () => { titleEdit[titleSlot] = { ...titleEdit[titleSlot], shape: b.dataset.tsh }; draw(); };
+  });
+  const save = document.getElementById("t-save");
+  if (save) save.onclick = async () => {
+    titleMsg = { err: "", ok: "" };
+    try {
+      const enc = (v) => v === "auto" ? "auto" : v === null ? null : { id: v.id, shape: v.shape || "rect" };
+      me = await api("/api/app/titles/equip", { top: enc(titleEdit.top), bottom: enc(titleEdit.bottom) });
+      titleData = me.titles;
+      startTitleEdit();
+      titleMsg.ok = "称号を保存しました。グループのランキングにもすぐ出ます";
+    } catch (e) { titleMsg.err = e.message; }
+    draw();
+  };
+}
+
+
+// ---- 管理人: ユニーク称号を付ける ----
+function grantBox() {
+  const f = grantForm;
+  const users = adminTitles.users || [];
+  const sample = { label: f.label || "称号の文字", sub: f.sub, year: f.year, design: f.design, shape: f.shape || "rect" };
+  return `<div class="pf">
+    <h3>管理(ユニーク称号を付ける)</h3>
+    <p class="note">ここで付けた称号はレアリティ「ユニーク」になります。まだ登録されていないクラロワのアカウントにも付けておけます(誰かがそのアカウントを登録したら、その人の称号になります)。形を決めると、本人は形を変えられません(炎の枠はここでだけ選べます)。</p>
+    <div class="pf-grid">
+      <select id="g-user"><option value="">付ける人</option>${users.map(u =>
+        `<option value="u:${esc(u.id)}"${"u:" + u.id === f.target ? " selected" : ""}>${esc(u.name || u.id)}</option>`).join("")}
+        <option value="tag"${f.target === "tag" ? " selected" : ""}>クラロワのタグで付ける</option>
+      </select>
+      <button class="cr-btn" id="g-4000">「レート4000到達」を入れる</button>
+    </div>
+    ${f.target === "tag" ? `<div class="pf-row" style="margin-top:6px"><input id="g-tag" placeholder="#タグ" autocapitalize="characters" value="${esc(f.tag)}"></div>` : ""}
+    <div class="pf-row" style="margin-top:6px"><input id="g-label" maxlength="20" placeholder="称号の文字" value="${esc(f.label)}"></div>
+    <div class="pf-grid" style="margin-top:6px">
+      <input id="g-sub" maxlength="24" placeholder="小見出し(英字など・任意)" value="${esc(f.sub)}">
+      <input id="g-year" maxlength="8" placeholder="年(任意)" value="${esc(f.year)}">
+      <select id="g-design">${Titles.DESIGNS.map(d =>
+        `<option value="${d.id}"${d.id === f.design ? " selected" : ""}>${esc(d.name)}</option>`).join("")}</select>
+      <select id="g-shape"><option value="">形: 本人が選ぶ</option>${Titles.SHAPES.map(sh =>
+        `<option value="${sh.id}"${sh.id === f.shape ? " selected" : ""}>形: ${esc(sh.name)}</option>`).join("")}</select>
+    </div>
+    <div class="title-row">${titleHtml(sample)}</div>
+    <div class="title-row">${titleHtml(sample, true)}</div>
+    <button class="cr-btn go gold" id="g-add">この称号を付ける</button>
+    <div class="t-label">付けた称号</div>
+    ${(adminTitles.grants || []).map(g => `<div class="acc">
+      <span class="acc-body"><span style="display:block;margin-bottom:4px">${titleHtml({ ...g, shape: g.shape || "rect" })}</span><small>${esc(g.userName || g.userId)} に付けた</small></span>
+      <span class="acc-btns"><button class="cr-btn" data-revoke="${esc(g.id)}">外す</button></span>
+    </div>`).join("") || `<p class="note">まだありません。</p>`}
+  </div>`;
+}
+
+function bindGrantBox() {
+  if (!adminTitles) return;
+  const $ = (id) => document.getElementById(id);
+  const sync = () => {
+    grantForm = { target: $("g-user").value, tag: $("g-tag")?.value || grantForm.tag, label: $("g-label").value, sub: $("g-sub").value,
+                  year: $("g-year").value, design: $("g-design").value, shape: $("g-shape").value };
+  };
+  ["g-user", "g-design", "g-shape", "g-label", "g-sub", "g-year", "g-tag"].forEach(id => { if ($(id)) $(id).onchange = () => { sync(); draw(); }; });
+  $("g-4000").onclick = () => { sync(); grantForm.label = "レート4000到達"; draw(); };
+  $("g-add").onclick = async () => {
+    sync();
+    profileMsg = { err: "", ok: "" };
+    try {
+      const target = grantForm.target === "tag" ? "t:" + clean(grantForm.tag) : grantForm.target;
+      adminTitles = await api("/api/app/admin/titles/grant", { ...grantForm, target });
+      grantForm = { ...grantForm, label: "", sub: "", year: "" };
+      profileMsg.ok = "称号を付けました";
+    } catch (e) { profileMsg.err = e.message; alert(e.message); }
+    draw();
+  };
+  $main.querySelectorAll("[data-revoke]").forEach(b => {
+    b.onclick = async () => {
+      if (!confirm("この称号を外しますか？")) return;
+      try { adminTitles = await api("/api/app/admin/titles/revoke", { id: b.dataset.revoke }); }
+      catch (e) { alert(e.message); }
+      draw();
+    };
+  });
+}
+
+// ---- グループ一覧(最初の画面) ----
+let homeMsg = { err: "", ok: "" }, homeForm = "";   // homeForm: "" / "create" / "join"
+
+async function openHome() {
+  view = "home"; groupId = null; selectedTag = null;
+  try { window.history.replaceState(null, "", "/app/"); } catch {}
+  draw();
+  try { await loadMe(); } catch (e) { homeMsg.err = e.message; }
+  if (view === "home") draw();
+}
+
+function drawHome() {
+  if (!me) { $main.innerHTML = `<div class="notice">読み込み中…</div>`; return; }
+  const roleName = { owner: "作った人", admin: "管理者", member: "メンバー" };
+  const groups = me.groups.map(g => `<button class="grp" data-open="${esc(g.id)}">
+      <span class="grp-body"><b>${esc(g.name)}</b><small>${g.members}人 · ${esc(roleName[g.role] || "")} · ID ${esc(g.id)}</small></span>
+      <span class="chev">›</span>
+    </button>`).join("");
+  const invites = me.invites.map(i => `<div class="acc">
+      <span class="acc-body"><b>${esc(i.groupName)}</b><small>${esc(i.inviter)} さんからの招待</small></span>
+      <span class="acc-btns"><button class="cr-btn go gold" data-inv-accept="${esc(i.groupId)}">参加</button><button class="cr-btn" data-inv-decline="${esc(i.groupId)}">断る</button></span>
+    </div>`).join("");
+  $main.innerHTML = `
+    ${me.accounts.length ? "" : `<div class="pf hint-box">まず👤マイページで<b>クラロワのアカウント</b>を登録してください。登録すると、入っているグループのランキングに出ます。
+      <div style="margin-top:8px"><button class="cr-btn go gold" id="go-profile">マイページへ</button></div></div>`}
+    ${invites ? `<div class="pf"><h3>グループへの招待</h3>${invites}</div>` : ""}
+    <div class="sect"><span class="sect-title display">入っているグループ</span></div>
+    ${groups || `<div class="notice" style="padding:20px 10px">まだグループに入っていません。<br>グループを作るか、教えてもらったグループIDとパスワードで入ってください。</div>`}
+    <div class="home-btns">
+      <button class="cr-btn${homeForm === "create" ? " on" : ""}" id="show-create">＋ グループを作る</button>
+      <button class="cr-btn${homeForm === "join" ? " on" : ""}" id="show-join">グループに入る</button>
+    </div>
+    ${homeForm === "create" ? `<div class="pf">
+      <h3>グループを作る</h3>
+      <p class="note">入るときに使うパスワードを決めてください。作ったあと、招待リンクも出ます。</p>
+      <div class="pf-row"><input id="gc-name" maxlength="20" placeholder="グループ名"></div>
+      <div class="pf-row" style="margin-top:6px"><input id="gc-pass" type="text" maxlength="64" placeholder="パスワード(4文字以上)" autocomplete="off"></div>
+      <div style="margin-top:8px"><button class="cr-btn go gold" id="gc-go">作る</button></div>
+    </div>` : ""}
+    ${homeForm === "join" ? `<div class="pf">
+      <h3>グループに入る</h3>
+      <p class="note">グループを作った人から、グループIDとパスワードを教えてもらってください。招待リンクをもらった人は、リンクを開くだけで入れます。</p>
+      <div class="pf-row"><input id="gj-id" maxlength="10" placeholder="グループID" autocapitalize="characters"></div>
+      <div class="pf-row" style="margin-top:6px"><input id="gj-pass" type="text" maxlength="64" placeholder="パスワード" autocomplete="off"></div>
+      <div style="margin-top:8px"><button class="cr-btn go gold" id="gj-go">入る</button></div>
+    </div>` : ""}
+    ${homeMsg.err ? `<p class="err">${esc(homeMsg.err)}</p>` : ""}
+    ${homeMsg.ok ? `<p class="ok">${esc(homeMsg.ok)}</p>` : ""}
+    ${currentUser ? `<div class="whoami">${esc(currentUser.name)} でログイン中 · <button id="logout">ログアウト</button></div>` : ""}`;
+
+  const $ = (id) => document.getElementById(id);
+  const run = async (fn, after) => {
+    homeMsg = { err: "", ok: "" };
+    try { const d = await fn(); useMe(d); if (after) return after(d); }
+    catch (e) { homeMsg.err = e.message; }
+    draw();
+  };
+  $main.querySelectorAll("[data-open]").forEach(b => { b.onclick = () => openGroup(b.dataset.open); });
+  $main.querySelectorAll("[data-inv-accept]").forEach(b => { b.onclick = () => run(() => api("/api/app/invites/accept", { groupId: b.dataset.invAccept }), d => openGroup(d.joined)); });
+  $main.querySelectorAll("[data-inv-decline]").forEach(b => { b.onclick = () => run(() => api("/api/app/invites/decline", { groupId: b.dataset.invDecline })); });
+  if ($("go-profile")) $("go-profile").onclick = () => openProfile();
+  $("show-create").onclick = () => { homeForm = homeForm === "create" ? "" : "create"; homeMsg = { err: "", ok: "" }; draw(); };
+  $("show-join").onclick = () => { homeForm = homeForm === "join" ? "" : "join"; homeMsg = { err: "", ok: "" }; draw(); };
+  if ($("gc-go")) $("gc-go").onclick = () => run(() => api("/api/app/groups/create", { name: $("gc-name").value, password: $("gc-pass").value }),
+    d => { homeForm = ""; groupView = "members"; openGroupPage(d.created); });
+  if ($("gj-go")) $("gj-go").onclick = () => run(() => api("/api/app/groups/join", { groupId: $("gj-id").value, password: $("gj-pass").value }),
+    d => { homeForm = ""; openGroup(d.joined); });
+  const $logout = document.getElementById("logout");
+  if ($logout) $logout.onclick = () => logout();
+}
+
+// ---- グループのランキング ----
+function openGroup(id) {
+  groupId = id; view = "board"; selectedTag = null; index = null; roster = { users: [] };
+  try { window.history.replaceState(null, "", `/app/?g=${encodeURIComponent(id)}`); } catch {}
+  draw();
+  loadBoard();
+}
+
+function groupHeader() {
+  if (!groupInfo) return "";
+  return `<div class="grp-head">
+    <span class="grp-name">${esc(groupInfo.name)}</span>
+    <button class="cr-btn" id="grp-members">メンバー・招待</button>
+  </div>`;
+}
+function bindGroupHeader() {
+  const b = document.getElementById("grp-members");
+  if (b) b.onclick = () => openGroupPage(groupId);
+}
+
+// ---- グループのメンバー・招待・設定 ----
+let groupPage = null, groupMsg = { err: "", ok: "" }, groupView = "members";
+
+async function openGroupPage(id) {
+  groupId = id; view = "group"; groupMsg = { err: "", ok: "" };
+  draw();
+  try {
+    const [d] = await Promise.all([api(`/api/app/groups/${id}`), me ? null : loadMe()]);
+    groupPage = d;
+  } catch (e) { groupMsg.err = e.message; }
+  if (view === "group") draw();
+}
+
+function drawGroupPage() {
+  if (!groupPage || groupPage.group.id !== groupId) {
+    $main.innerHTML = groupMsg.err ? `<div class="notice">${esc(groupMsg.err)}</div>` : `<div class="notice">読み込み中…</div>`;
+    return;
+  }
+  const { group, members } = groupPage;
+  const manage = group.role === "owner" || group.role === "admin";
+  const owner = group.role === "owner";
+  const link = group.invite ? `${location.origin}/app/?join=${group.invite}` : "";
+  const roleName = { owner: "作った人", admin: "管理者", member: "" };
+  const inGroup = new Set(members.map(m => m.id));
+  const friends = (me?.friends || []).filter(f => !inGroup.has(f.id));
+
+  const rows = members.map(m => `<div class="mem">
+      <div class="mem-head">${avatarImg(m)}<b>${esc(m.name)}</b>${roleName[m.role] ? `<span class="mem-role">${roleName[m.role]}</span>` : ""}
+        ${manage && m.id !== currentUser?.id && m.role !== "owner" ? `<span class="acc-btns">
+          ${owner ? `<button class="cr-btn" data-role="${esc(m.id)}" data-to="${m.role === "admin" ? "member" : "admin"}">${m.role === "admin" ? "管理者を外す" : "管理者にする"}</button>` : ""}
+          <button class="cr-btn" data-kick="${esc(m.id)}">外す</button></span>` : ""}
+      </div>
+      ${m.accounts.map(a => `<div class="mem-acc${a.hidden ? " hidden-acc" : ""}">
+        <span>${a.role === "main" ? "メイン" : "サブ"}: ${esc(a.name || a.tag)} <small>#${esc(a.tag)}</small>${a.hidden ? " <em>(このグループには出さない)</em>" : ""}</span>
+        ${manage ? `<button class="cr-btn mini" data-hide="${esc(m.id)}" data-tag="${esc(a.tag)}" data-hidden="${a.hidden ? 0 : 1}">${a.hidden ? "出す" : "出さない"}</button>` : ""}
+      </div>`).join("") || `<div class="mem-acc"><small>まだアカウントを登録していません</small></div>`}
+    </div>`).join("");
+
+  $main.innerHTML = `
+    <div class="grp-head"><span class="grp-name">${esc(group.name)}</span><button class="cr-btn" id="to-board">ランキングへ</button></div>
+    <div class="pf">
+      <h3>入り方</h3>
+      <div class="code-box"><span>グループID</span><b>${esc(group.id)}</b><button class="cr-btn" id="copy-gid">コピー</button></div>
+      <p class="note">グループIDとパスワードを教えると、その人が入れます。</p>
+      ${link ? `<div class="t-label">招待リンク(開くだけで入れます)</div>
+        <div class="pf-row"><input id="inv-link" readonly value="${esc(link)}"><button class="cr-btn go gold" id="copy-link">コピー</button></div>
+        <p class="note">リンクを知っている人は誰でも入れます。広まりすぎたら、下の「設定」で新しいリンクに変えてください(古いリンクは使えなくなります)。</p>` : ""}
+    </div>
+    <div class="pf">
+      <h3>友達を招待</h3>
+      ${friends.length ? friends.map(f => `<div class="acc">${avatarImg(f)}<span class="acc-body"><b>${esc(f.name)}</b></span>
+        <span class="acc-btns"><button class="cr-btn go gold" data-invite="${esc(f.id)}">招待</button></span></div>`).join("")
+        : `<p class="note">招待できる友達がいません。👤マイページで友達を追加すると、ここから招待できます。</p>`}
+    </div>
+    <div class="pf">
+      <h3>メンバー(${members.length}人)</h3>
+      ${manage ? `<p class="note">ほかの人のアカウントを勝手に登録している人がいたら、「出さない」でこのグループのランキングから外せます。</p>` : ""}
+      ${rows}
+    </div>
+    ${manage ? `<div class="pf">
+      <h3>設定</h3>
+      <div class="pf-row"><input id="gs-name" maxlength="20" value="${esc(group.name)}"><button class="cr-btn go gold" id="gs-name-save">名前を変える</button></div>
+      <div class="pf-row" style="margin-top:6px"><input id="gs-pass" type="text" maxlength="64" placeholder="新しいパスワード" autocomplete="off"><button class="cr-btn go gold" id="gs-pass-save">パスワードを変える</button></div>
+      <div style="margin-top:8px"><button class="cr-btn" id="gs-invite">招待リンクを新しくする</button></div>
+    </div>` : ""}
+    ${groupMsg.err ? `<p class="err">${esc(groupMsg.err)}</p>` : ""}
+    ${groupMsg.ok ? `<p class="ok">${esc(groupMsg.ok)}</p>` : ""}
+    <div style="margin:14px 0">${owner
+      ? `<button class="cr-btn danger" id="gs-delete">グループを消す</button>`
+      : `<button class="cr-btn danger" id="g-leave">グループを抜ける</button>`}</div>`;
+
+  const $ = (id) => document.getElementById(id);
+  const act = async (action, body, okMsg, confirmMsg) => {
+    if (confirmMsg && !confirm(confirmMsg)) return;
+    groupMsg = { err: "", ok: "" };
+    try {
+      const d = await api(`/api/app/groups/${groupId}/${action}`, body || {});
+      if (d.group) groupPage = d; else { useMe(d); return openHome(); }
+      groupMsg.ok = okMsg || "";
+    } catch (e) { groupMsg.err = e.message; }
+    draw();
+  };
+  $("to-board").onclick = () => openGroup(groupId);
+  $("copy-gid").onclick = (e) => copyText(group.id, e.target);
+  if ($("copy-link")) $("copy-link").onclick = (e) => copyText(link, e.target);
+  $main.querySelectorAll("[data-invite]").forEach(b => { b.onclick = () => act("invite", { userId: b.dataset.invite }, "招待しました。相手のグループ一覧に招待が届きます"); });
+  $main.querySelectorAll("[data-kick]").forEach(b => { b.onclick = () => act("kick", { userId: b.dataset.kick }, "外しました", "この人をグループから外しますか？"); });
+  $main.querySelectorAll("[data-role]").forEach(b => { b.onclick = () => act("role", { userId: b.dataset.role, role: b.dataset.to }, "変更しました"); });
+  $main.querySelectorAll("[data-hide]").forEach(b => {
+    b.onclick = () => act("hide", { userId: b.dataset.hide, tag: b.dataset.tag, hidden: b.dataset.hidden === "1" }, "変更しました。ランキングには次の更新(10分以内)から反映されます");
+  });
+  if ($("gs-name-save")) $("gs-name-save").onclick = () => act("settings", { name: $("gs-name").value }, "名前を変えました");
+  if ($("gs-pass-save")) $("gs-pass-save").onclick = () => act("settings", { password: $("gs-pass").value }, "パスワードを変えました");
+  if ($("gs-invite")) $("gs-invite").onclick = () => act("settings", { newInvite: true }, "新しい招待リンクにしました", "今の招待リンクは使えなくなります。いいですか？");
+  if ($("gs-delete")) $("gs-delete").onclick = () => act("delete", {}, "", "グループを消しますか？元に戻せません。");
+  if ($("g-leave")) $("g-leave").onclick = () => act("leave", {}, "", "このグループを抜けますか？");
+}
+
+// ---- 招待リンクを開いたとき ----
+let joinInfo = null;
+async function openJoin(code) {
+  view = "join"; joinInfo = { code };
+  draw();
+  try { joinInfo = { code, ...(await api(`/api/app/groups/info?invite=${encodeURIComponent(code)}`)) }; await loadMe(); }
+  catch (e) { joinInfo.error = e.message; }
+  if (view === "join") draw();
+}
+function drawJoin() {
+  if (!joinInfo || (!joinInfo.name && !joinInfo.error)) { $main.innerHTML = `<div class="notice">読み込み中…</div>`; return; }
+  if (joinInfo.error) { $main.innerHTML = `<div class="notice err">${esc(joinInfo.error)}</div><div style="text-align:center"><button class="cr-btn" id="j-home">グループ一覧へ</button></div>`; }
+  else {
+    const already = (me?.groups || []).some(g => g.id === joinInfo.id);
+    $main.innerHTML = `<div class="pf" style="text-align:center">
+      <p class="note">グループへの招待です</p>
+      <h3 style="font-size:20px;margin:6px 0">${esc(joinInfo.name)}</h3>
+      <p class="note">${joinInfo.members}人が参加中</p>
+      ${already ? `<button class="cr-btn go gold" id="j-open">ランキングを見る</button>` : `<button class="cr-btn go gold" id="j-go">参加する</button>`}
+      <p class="err" id="j-err"></p>
+    </div>`;
+  }
+  const $ = (id) => document.getElementById(id);
+  if ($("j-home")) $("j-home").onclick = () => openHome();
+  if ($("j-open")) $("j-open").onclick = () => openGroup(joinInfo.id);
+  if ($("j-go")) $("j-go").onclick = async () => {
+    try { const d = await api("/api/app/groups/join", { invite: joinInfo.code }); useMe(d); openGroup(d.joined); }
+    catch (e) { $("j-err").textContent = e.message; }
+  };
+}
+
+// ---- 画面の切り替え ----
+function draw() {
+  if (view === "auth") return;
+  const top = view === "home";
+  $back.hidden = top;
+  $navGroups.hidden = !top && view !== "board";
+  $navProfile.hidden = !top && view !== "board";
+  $navHome.hidden = !top;
+  $crest.textContent = view === "player" ? "PLAYER" : view === "profile" ? "MY PAGE"
+    : view === "group" ? "GROUP" : view === "board" ? "RANKING" : "GROUP RANKING";
+  drawTabs();
+  if (view === "home") return drawHome();
+  if (view === "profile") return drawProfile();
+  if (view === "group") return drawGroupPage();
+  if (view === "join") return drawJoin();
+  if (view === "player") return drawPlayer();
+  if (!index) { $main.innerHTML = groupHeader() + `<div class="notice">読み込み中…</div>`; return; }
+  drawBoard();
+}
+
+$navGroups.onclick = () => openHome();
+$navProfile.onclick = () => openProfile();
+$back.onclick = () => {
+  if (view === "player" && groupId) { view = "board"; selectedTag = null; opened.clear(); return draw(); }
+  if (view === "player") return openProfile();
+  if (view === "group") return openGroup(groupId);
+  openHome();
+};
+$refresh.onclick = () => {
+  if (view === "profile") return openProfile();
+  if (view === "home") return openHome();
+  if (view === "group") return openGroupPage(groupId);
+  if (view === "player" && selectedTag) { const t = selectedTag; return openPlayer(t); }
+  if (view === "board") return loadBoard();
+};
+
+// 起動。ログインしていれば、リンクに合わせてグループ・招待・一覧を開く
+(async () => {
+  const q = new URLSearchParams(location.search);
+  const reason = q.get("login");
+  try { await loadMe(); }
+  catch { return showAuth(reason); }
+  $refresh.hidden = false;
+  if (q.get("join")) return openJoin(q.get("join"));
+  if (q.get("g")) return openGroup(q.get("g"));
+  openHome();
+})();
+</script>
+</body>
+</html>

@@ -110,3 +110,87 @@ CREATE TABLE IF NOT EXISTS tag_grants (
   granted_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS tag_grants_tag ON tag_grants (tag);
+
+-- ==================== グループランキング(Google でログイン。誰でも使える) ====================
+-- 利用者。id はこちらで振る(英数字)。friend_code は友達追加に使う短い番号
+CREATE TABLE IF NOT EXISTS app_users (
+  id           TEXT PRIMARY KEY,
+  google_sub   TEXT UNIQUE NOT NULL,
+  email        TEXT,
+  name         TEXT,
+  avatar       TEXT,
+  display_name TEXT,
+  friend_code  TEXT UNIQUE NOT NULL,
+  created_at   TEXT NOT NULL,
+  last_login   TEXT
+);
+
+-- 利用者が登録したクラロワのアカウント(メイン1つ+サブ2つまで)。
+-- 誰でも登録できるので、同じタグを別の人が登録することもある(グループの管理者が外せる)
+CREATE TABLE IF NOT EXISTS app_tags (
+  user_id  TEXT NOT NULL,
+  tag      TEXT NOT NULL,
+  role     TEXT NOT NULL,          -- 'main' か 'sub'
+  name     TEXT,
+  added_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, tag)
+);
+CREATE INDEX IF NOT EXISTS app_tags_tag ON app_tags (tag);
+
+-- グループ。入るにはパスワードか招待リンク(invite_code)
+CREATE TABLE IF NOT EXISTS app_groups (
+  id          TEXT PRIMARY KEY,      -- グループID(人に伝える短い英数字)
+  name        TEXT NOT NULL,
+  owner_id    TEXT NOT NULL,
+  pass_hash   TEXT NOT NULL,
+  pass_salt   TEXT NOT NULL,
+  invite_code TEXT UNIQUE NOT NULL,
+  created_at  TEXT NOT NULL
+);
+
+-- グループのメンバー。role は 'owner'(作った人) / 'admin'(管理者) / 'member'
+CREATE TABLE IF NOT EXISTS app_group_members (
+  group_id  TEXT NOT NULL,
+  user_id   TEXT NOT NULL,
+  role      TEXT NOT NULL,
+  joined_at TEXT NOT NULL,
+  PRIMARY KEY (group_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS app_group_members_user ON app_group_members (user_id);
+
+-- グループの管理者が「このグループには出さない」にしたアカウント(なりすまし対策)
+CREATE TABLE IF NOT EXISTS app_group_hidden (
+  group_id TEXT NOT NULL,
+  user_id  TEXT NOT NULL,
+  tag      TEXT NOT NULL,
+  PRIMARY KEY (group_id, user_id, tag)
+);
+
+-- 友達。1組につき1行(user_a < user_b)。status は 'pending'(申請中) か 'friends'
+CREATE TABLE IF NOT EXISTS app_friends (
+  user_a     TEXT NOT NULL,
+  user_b     TEXT NOT NULL,
+  requested_by TEXT NOT NULL,
+  status     TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (user_a, user_b)
+);
+CREATE INDEX IF NOT EXISTS app_friends_b ON app_friends (user_b);
+
+-- 友達からのグループへの招待(受けるとパスワードなしで入れる)
+CREATE TABLE IF NOT EXISTS app_group_invites (
+  group_id   TEXT NOT NULL,
+  user_id    TEXT NOT NULL,
+  inviter_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (group_id, user_id)
+);
+
+-- グループのパスワード間違いの回数(総当たり対策)
+CREATE TABLE IF NOT EXISTS app_join_fails (
+  group_id TEXT NOT NULL,
+  user_id  TEXT NOT NULL,
+  count    INTEGER NOT NULL,
+  last_at  INTEGER NOT NULL,
+  PRIMARY KEY (group_id, user_id)
+);

@@ -25,6 +25,8 @@
 //   ADMIN_DISCORD_IDS … 管理人の Discord ユーザーID(カンマ区切り)
 //   CR_API_TOKEN … クラロワAPI(登録するタグが本当にあるか確かめる)
 
+import { handleApp, currentAppUser } from "./app.js";
+
 const SESSION_DAYS = 30;          // メンバーシップをやめた人が残り続けないよう、ひと月で入り直し
 const MAX_SUBS = 2;               // サブアカウントの上限(メインは1つ)
 const DISCORD = "https://discord.com/api";
@@ -657,6 +659,19 @@ export default {
       if (p === "/api/discord/callback") return await discordCallback(request, env);
       if (p === "/api/logout" && post) return await logout(request, env);
       if (p === "/api/public/player") return await publicPlayer(url, env, ctx);
+      // グループランキング(Google でログイン)
+      const appRes = await handleApp(request, env, url);
+      if (appRes) return appRes;
+      // 戦績データ。グループランキングの人は、アカウントごとのファイルだけ読める(一覧のファイルは読めない)
+      if (p.startsWith("/api/data/")) {
+        if (await currentUserId(request, env)) return await data(env, url);
+        if (await currentAppUser(request, env)) {
+          const rel = decodeURIComponent(p.slice("/api/data/".length));
+          if (!/^[0-9A-Z]{3,12}\/(recent|trophies|player|badges)\.json$/.test(rel)) return fail(403, "読めないファイルです");
+          return await data(env, url);
+        }
+        return fail(401, "ログインしてください");
+      }
 
       if (p.startsWith("/api/")) {
         // ここから先はログインした人だけ
