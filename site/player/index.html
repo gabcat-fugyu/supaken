@@ -301,7 +301,7 @@ function render() {
 
     <div class="sect"><span class="sect-title">直近の対戦</span><span class="sect-note">${battles.length}試合 · タップでデッキ</span></div>
     ${bouts || `<div class="notice">対戦の記録がありません。</div>`}
-    <p class="hint">クラロワAPIで見られるのは直近25試合までです。データは数分ごとに新しくなります。</p>`;
+    <p class="hint">クラロワAPIで見られるのは直近30試合くらいまでです。データは数分ごとに新しくなります。</p>`;
 
   $main.querySelectorAll(".bout-face").forEach(el => {
     el.onclick = () => { const i = +el.dataset.i; opened.has(i) ? opened.delete(i) : opened.add(i); render(); };
