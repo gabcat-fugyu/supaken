@@ -16,6 +16,7 @@
 //   /api/admin/titles, /grant, /revoke           管理人: ユニーク称号を付ける・外す
 //   /api/admin/guests, /add, /remove             管理人: メン限ロールが無くても入れる人
 //   /api/data/...                                戦績データ(R2 の members/...)
+//   /api/public/player?tag=...                   プレイヤー検索(誰でも。ログイン不要)
 //
 // 使うもの(wrangler.toml / secret):
 //   DB    … D1(sessions / discord_users / profiles / game_accounts / title_grants / title_equips)
@@ -560,6 +561,72 @@ async function accountMain(request, env, id) {
   return json(await profile(env, id));
 }
 
+// ---- プレイヤー検索(誰でも使える) ----
+// 検索されたときに、その1人分だけクラロワAPIに聞く(プロフィールと直近の対戦)。
+// 同じ人を続けて検索されても API を叩きすぎないよう、結果を少しの間取っておく
+const SEARCH_CACHE_SECONDS = 180;
+const TAG_CHARS = /^[0289PYLQGRJCUV]{3,12}$/;
+
+async function crGet(env, path) {
+  return fetch(`${CR_API}${path}`, {
+    headers: { Authorization: `Bearer ${env.CR_API_TOKEN}`, Accept: "application/json", "User-Agent": UA },
+  });
+}
+
+const slimCard = (c) => c && {
+  id: c.id, name: c.name, level: c.level, maxLevel: c.maxLevel, elixirCost: c.elixirCost,
+  evolutionLevel: c.evolutionLevel, iconUrls: c.iconUrls,
+};
+const slimSide = (p) => p && {
+  tag: p.tag, name: p.name, crowns: p.crowns, startingTrophies: p.startingTrophies, trophyChange: p.trophyChange,
+  clan: p.clan ? p.clan.name : null, cards: (p.cards || []).map(slimCard), supportCards: (p.supportCards || []).map(slimCard),
+};
+const season = (r) => r ? { leagueNumber: r.leagueNumber, trophies: r.trophies, rank: r.rank } : null;
+
+async function publicPlayer(url, env, ctx) {
+  const tag = cleanTag(url.searchParams.get("tag"));
+  if (!TAG_CHARS.test(tag)) return fail(400, "タグが正しくありません。#から始まる英数字(0289PYLQGRJCUV)を入れてください");
+  const cacheKey = new Request(`https://${MAIN_HOST}/api/public/player?tag=${tag}`);
+  const cache = caches.default;
+  const hit = await cache.match(cacheKey);
+  if (hit) return hit;
+
+  const [pr, br] = await Promise.all([crGet(env, `/players/%23${tag}`), crGet(env, `/players/%23${tag}/battlelog`)]);
+  if (pr.status === 404) return fail(404, "プレイヤーが見つかりませんでした。タグを確かめてください");
+  if (!pr.ok) return fail(502, "クラロワのサーバーにつながりませんでした。少し待ってからもう一度試してください");
+  const p = await pr.json();
+  const battles = br.ok ? await br.json() : [];
+  // 20勝チャレンジを達成した年(プロフィールのバッジ Crl20Wins2025 など)
+  const years = [];
+  for (const b of p.badges || []) {
+    const m = /^Crl20Wins(\d{4})$/.exec(b.name || "");
+    if (m && (b.progress == null || b.progress >= 20)) years.push(Number(m[1]));
+  }
+  years.sort((a, b) => b - a);
+
+  const body = {
+    fetchedAt: new Date().toISOString(),
+    player: {
+      tag: p.tag, name: p.name, expLevel: p.expLevel,
+      trophies: p.trophies, bestTrophies: p.bestTrophies, arena: p.arena ? p.arena.name : null,
+      wins: p.wins, losses: p.losses, battleCount: p.battleCount, threeCrownWins: p.threeCrownWins,
+      clan: p.clan ? { name: p.clan.name, tag: p.clan.tag } : null, role: p.role,
+      pol: season(p.currentPathOfLegendSeasonResult), bestPol: season(p.bestPathOfLegendSeasonResult),
+      lastPol: season(p.lastPathOfLegendSeasonResult),
+      deck: (p.currentDeck || []).map(slimCard), deckSupport: (p.currentDeckSupportCards || []).map(slimCard),
+      favourite: p.currentFavouriteCard ? { name: p.currentFavouriteCard.name, iconUrls: p.currentFavouriteCard.iconUrls } : null,
+      crl20Years: years,
+    },
+    battles: (Array.isArray(battles) ? battles : []).map((b) => ({
+      type: b.type, battleTime: b.battleTime, mode: b.gameMode ? b.gameMode.name : null, leagueNumber: b.leagueNumber,
+      team: (b.team || []).map(slimSide), opponent: (b.opponent || []).map(slimSide),
+    })),
+  };
+  const res = json(body, 200, { "cache-control": `public, max-age=${SEARCH_CACHE_SECONDS}` });
+  ctx.waitUntil(cache.put(cacheKey, res.clone()));
+  return res;
+}
+
 // ---- 戦績データ ----
 async function data(env, url) {
   const rel = decodeURIComponent(url.pathname.slice("/api/data/".length));
@@ -575,7 +642,7 @@ async function data(env, url) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const p = url.pathname;
     const post = request.method === "POST";
@@ -589,6 +656,7 @@ export default {
       if (p === "/api/discord/login") return discordLogin(request, env);
       if (p === "/api/discord/callback") return await discordCallback(request, env);
       if (p === "/api/logout" && post) return await logout(request, env);
+      if (p === "/api/public/player") return await publicPlayer(url, env, ctx);
 
       if (p.startsWith("/api/")) {
         // ここから先はログインした人だけ

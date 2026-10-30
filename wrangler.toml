@@ -8,8 +8,9 @@ workers_dev = false
 [assets]
 directory = "site"
 binding = "ASSETS"
-# member.supaken.com の転送のため、全部のリクエストで入口を通す
-run_worker_first = true
+# member.supaken.com の転送のため、ページは入口(Worker)を通す。
+# 画像・CSS・JS は入口を通さずにそのまま配る(Worker の回数に数えられない)
+run_worker_first = ["/*", "!/assets/*", "!/*.css", "!/*.js"]
 
 # 戦績データの置き場
 [[r2_buckets]]

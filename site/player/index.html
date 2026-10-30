@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07173a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="スパ研">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/assets/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/base.css">
+<title>プレイヤー検索 | スパ研便利ツール</title>
+<style>
+  .search { display: flex; gap: 8px; }
+  .search input {
+    flex: 1; min-width: 0; font: inherit; font-size: 16px; font-weight: 800; color: var(--ink);
+    padding: 11px 14px; border-radius: 12px; background: rgba(6,16,40,0.7);
+    border: 2px solid var(--panel-edge); outline: none; text-transform: uppercase;
+  }
+  .search input:focus { border-color: var(--gold); }
+  .search input::placeholder { color: #6d84ad; text-transform: none; }
+  .search .go { color: #3d2600; text-shadow: none; background: linear-gradient(180deg, var(--gold-lite), var(--gold)); border-color: var(--gold-deep); }
+  .hint { font-size: 11px; color: var(--ink-dim); margin: 8px 2px 0; line-height: 1.6; }
+  .recent { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12px; font-weight: 800;
+    color: var(--ink); padding: 5px 6px 5px 10px; border-radius: 999px; cursor: pointer;
+    background: rgba(6,16,40,0.6); border: 1px solid rgba(120,170,240,0.4);
+  }
+  .chip small { color: var(--ink-dim); font-weight: 700; }
+  .chip .x { border: 0; background: none; color: var(--ink-dim); font-size: 14px; padding: 0 4px; cursor: pointer; }
+  .notice { text-align: center; padding: 40px 18px; color: var(--ink-dim); font-size: 13px; line-height: 1.9; }
+  .err { color: #ff9a9a; }
+
+  .banner {
+    position: relative; text-align: center; padding: 18px 14px 16px; margin: 16px 0 12px;
+    background: linear-gradient(180deg, rgba(44,94,190,0.95), rgba(13,40,96,0.95));
+    border: 3px solid var(--gold-deep); border-radius: 18px;
+  }
+  .b-name { font-family: 'Mochiy Pop One', sans-serif; font-size: 20px; word-break: break-all; }
+  .b-tag { font-size: 11px; color: var(--ink-dim); margin-top: 2px; }
+  .b-clan { font-size: 12px; color: var(--gold-lite); margin-top: 4px; }
+  .b-shield { width: 72px; height: 72px; object-fit: contain; display: block; margin: 10px auto 2px; }
+  .b-league { font-family: 'Mochiy Pop One', sans-serif; font-size: 13px; color: var(--gold-lite); }
+  .plaque {
+    display: inline-flex; align-items: baseline; gap: 8px; margin-top: 8px; padding: 6px 18px; border-radius: 999px;
+    background: rgba(6,16,40,0.6); border: 2px solid var(--gold-deep);
+  }
+  .plaque span { font-size: 11px; color: var(--ink-dim); font-weight: 800; }
+  .plaque b { font-family: 'Mochiy Pop One', sans-serif; font-weight: 400; font-size: 28px; color: var(--gold); }
+  .b-foot { font-size: 11px; color: var(--ink-dim); margin-top: 6px; }
+  .chips { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .s-chip {
+    display: inline-flex; align-items: baseline; gap: 5px; padding: 4px 8px; border-radius: 8px;
+    font-family: 'Mochiy Pop One', sans-serif; font-size: 13px; color: var(--gold);
+    background: rgba(6,16,40,0.45); border: 1px solid rgba(120,170,240,0.3);
+  }
+  .s-chip i, .s-chip small { font-family: 'M PLUS Rounded 1c', sans-serif; font-style: normal; font-size: 9.5px; font-weight: 800; color: var(--ink-dim); }
+  .c20 { font-size: 10.5px; font-weight: 800; padding: 3px 8px; border-radius: 6px; color: #fff4c8;
+         background: linear-gradient(135deg, #6a1bd1, #c81f6e 55%, #ff8a1f); border: 1px solid var(--gold); }
+
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 6px; }
+  .tile { text-align: center; padding: 9px 4px 8px; border-radius: 12px; background: rgba(20,55,125,0.75); border: 1px solid rgba(96,150,235,0.4); }
+  .tile b { display: block; font-family: 'Mochiy Pop One', sans-serif; font-weight: 400; font-size: 17px; }
+  .tile b u { text-decoration: none; font-size: 10px; }
+  .tile small { display: block; font-size: 9.5px; color: var(--ink-dim); margin-top: 2px; }
+
+  .sect { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 18px 2px 8px; }
+  .sect-title { font-family: 'Mochiy Pop One', sans-serif; font-size: 15px; }
+  .sect-note { font-size: 10.5px; color: var(--ink-dim); }
+
+  .deckbox { padding: 10px; border-radius: 14px; background: rgba(20,55,125,0.6); border: 1px solid rgba(96,150,235,0.4); }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+  .slot { position: relative; aspect-ratio: 5 / 6; border-radius: 8px; background: rgba(6,16,40,0.55); overflow: hidden; }
+  .slot img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .slot .tag { position: absolute; left: 3px; top: 3px; font-size: 8px; font-weight: 800; line-height: 1; padding: 2px 4px; border-radius: 4px; color: #fff; }
+  .slot.evo { box-shadow: inset 0 0 0 2px #c77dff; }
+  .slot.evo .tag { background: #8a2be2; }
+  .slot.hero { box-shadow: inset 0 0 0 2px var(--gold); }
+  .slot.hero .tag { background: var(--gold-deep); }
+  .slot .lv { position: absolute; left: 0; right: 0; bottom: 0; text-align: center; font-size: 8.5px; font-weight: 800;
+              background: rgba(0,0,0,0.55); padding: 1px 0; }
+  .slot .lv.max { color: var(--gold-lite); }
+  .deck-foot { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 11px; color: var(--ink-dim); }
+  .tower { width: 26px; height: 26px; object-fit: contain; }
+  .avg { display: inline-flex; align-items: center; gap: 3px; }
+  .avg svg { width: 9px; height: 11px; fill: var(--elixir); }
+  .copy {
+    margin-left: auto; display: inline-flex; align-items: center; gap: 4px; text-decoration: none;
+    font-size: 11px; font-weight: 800; color: #3d2600; padding: 5px 10px; border-radius: 8px;
+    background: linear-gradient(180deg, var(--gold-lite), var(--gold)); border: 2px solid var(--gold-deep); border-bottom-width: 3px;
+  }
+  .copy svg { width: 10px; height: 10px; fill: currentColor; }
+  .who { font-size: 11px; font-weight: 800; color: var(--ink-dim); margin: 0 0 6px; }
+
+  .bout { margin-bottom: 7px; border-radius: 13px; overflow: hidden; border: 1px solid rgba(96,150,235,0.4); background: rgba(20,55,125,0.6); }
+  .bout-face { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 11px; font: inherit; color: var(--ink);
+               background: none; border: 0; text-align: left; cursor: pointer; }
+  .verdict { width: 44px; flex-shrink: 0; font-family: 'Mochiy Pop One', sans-serif; font-size: 12px; text-align: center; }
+  .bout.win .verdict { color: #7ee08a; }
+  .bout.lose .verdict { color: #ff8a8a; }
+  .bout.draw .verdict { color: var(--ink-dim); }
+  .bout.win { border-left: 4px solid #4cc35e; }
+  .bout.lose { border-left: 4px solid #e05252; }
+  .bout-body { flex: 1; min-width: 0; }
+  .bout-vs { display: block; font-size: 13px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bout-meta { display: block; font-size: 10.5px; color: var(--ink-dim); margin-top: 2px; }
+  .score { font-family: 'Mochiy Pop One', sans-serif; font-size: 15px; flex-shrink: 0; }
+  .delta.up { color: #7ee08a; } .delta.down { color: #ff8a8a; }
+  .chev { color: var(--ink-dim); font-size: 10px; flex-shrink: 0; }
+  .decks { display: grid; gap: 10px; padding: 0 10px 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="masthead">
+    <span class="crest">PLAYER SEARCH</span>
+    <a class="cr-btn" href="/">← トップ</a>
+  </div>
+  <form class="search" id="form">
+    <input id="q" placeholder="#タグ を入れて検索" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text">
+    <button class="cr-btn go" type="submit">検索</button>
+  </form>
+  <p class="hint">タグは、クラロワのプロフィールで名前の下にある「#」から始まる英数字です。名前では探せません。</p>
+  <div class="recent" id="recent"></div>
+  <div id="main"></div>
+  <p class="fine">This material is unofficial and is not endorsed by Supercell.<br>For more information see Supercell's Fan Content Policy: www.supercell.com/fan-content-policy.</p>
+</div>
+<button id="refresh" class="refresh" aria-label="更新" hidden>⟳</button>
+<script>
+// プレイヤー検索。タグを入れると、その人のプロフィールと直近の対戦をクラロワAPIから取ってくる(/api/public/player)。
+// 検索した人は、この端末にだけ履歴を残す(ワンタップで開き直せるように)
+const $ = (id) => document.getElementById(id);
+const $main = $("main");
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const clean = (t) => String(t || "").toUpperCase().replace(/[^0-9A-Z]/g, "").replace(/O/g, "0");
+
+const LEAGUES = { 1: "マスターI", 2: "マスターII", 3: "マスターIII", 4: "神々の挑戦I", 5: "神々の挑戦II", 6: "神々の挑戦III", 7: "天界" };
+const LEAGUE_FILES = {
+  1: "icon_League_Badge_Master_1.png", 2: "icon_League_Badge_Master_2.png", 3: "icon_League_Badge_Master_3.png",
+  4: "icon_League_Badge_Champion.png", 5: "icon_League_Badge_Grand_Champion.png", 6: "icon_League_Badge_Royal_Champion.png",
+  7: "icon_League_Badge_Ultimate_Champion.png",
+};
+const TENKAI = 7;
+const MODES = {
+  pathOfLegend: "ランクマッチ", PvP: "トロフィー戦", trail: "イベント", tournament: "大会", friendly: "フレンド",
+  clanMate: "クラン内", clanMate2v2: "クラン内 2v2", riverRacePvP: "クラン対戦", riverRaceDuel: "クラン対戦(デュエル)",
+  riverRaceDuelColosseum: "クラン対戦(デュエル)", boatBattle: "ボートバトル", challenge: "チャレンジ",
+  casual1v1: "カジュアル", casual2v2: "2v2", "2v2": "2v2",
+};
+const DROP = `<svg viewBox="0 0 10 13" aria-hidden="true"><path d="M5 0C5 0 0 5.6 0 8.6A5 5 0 0 0 10 8.6C10 5.6 5 0 5 0z"/></svg>`;
+const COPY_ICON = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1h8a2 2 0 0 1 2 2v8h-2V3H5zM1 5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2z"/></svg>`;
+
+// ---- 検索の履歴(この端末だけ) ----
+const RECENT_KEY = "supaken.playerSearch.recent";
+function readRecent() {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]").filter(x => x && x.tag); } catch { return []; }
+}
+function writeRecent(list) {
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, 12))); } catch {}
+}
+function drawRecent() {
+  const list = readRecent();
+  $("recent").innerHTML = list.map(x => `<span class="chip" data-tag="${esc(x.tag)}">${esc(x.name || "#" + x.tag)}<small>#${esc(x.tag)}</small>
+    <button class="x" data-del="${esc(x.tag)}" aria-label="履歴から消す">×</button></span>`).join("");
+  $("recent").querySelectorAll("[data-tag]").forEach(el => { el.onclick = (e) => { if (!e.target.dataset.del) search(el.dataset.tag); }; });
+  $("recent").querySelectorAll("[data-del]").forEach(el => {
+    el.onclick = (e) => { e.stopPropagation(); writeRecent(readRecent().filter(x => x.tag !== el.dataset.del)); drawRecent(); };
+  });
+}
+
+// ---- 表示の部品 ----
+const MAX_LEVEL = 16;
+const cardLevel = (c) => typeof c.level !== "number" ? null
+  : Math.min(MAX_LEVEL, c.level + (MAX_LEVEL - (typeof c.maxLevel === "number" ? c.maxLevel : MAX_LEVEL)));
+
+function slot(c, i) {
+  const kind = i < 3 && c.evolutionLevel === 1 ? "evo" : i < 3 && c.evolutionLevel === 2 ? "hero" : "";
+  const url = (kind === "evo" && c.iconUrls?.evolutionMedium) || (kind === "hero" && c.iconUrls?.heroMedium) || c.iconUrls?.medium || "";
+  const lv = cardLevel(c);
+  return `<div class="slot ${kind}">${url ? `<img src="${esc(url)}" alt="${esc(c.name || "")}" loading="lazy">` : ""}${
+    kind ? `<span class="tag">${kind === "evo" ? "進化" : "ヒーロー"}</span>` : ""}${
+    lv != null ? `<span class="lv${lv === MAX_LEVEL ? " max" : ""}">${lv === MAX_LEVEL ? "MAX" : "Lv" + lv}</span>` : ""}</div>`;
+}
+
+function copyUrl(cards, support) {
+  const ids = (cards || []).map(c => c.id).filter(n => typeof n === "number");
+  if (ids.length !== 8) return null;
+  const tower = (support || []).find(c => typeof c.id === "number");
+  return `https://link.clashroyale.com/en/?clashroyale://copyDeck?deck=${ids.join(";")}&l=Royals${tower ? `&tt=${tower.id}` : ""}`;
+}
+
+function deckHtml(cards, support, who) {
+  if (!cards || !cards.length) return `<div class="notice" style="padding:14px">デッキ情報なし</div>`;
+  const costs = cards.map(c => c.elixirCost).filter(v => typeof v === "number");
+  const avg = costs.length ? (costs.reduce((a, b) => a + b, 0) / costs.length).toFixed(1) : null;
+  const tower = (support || [])[0];
+  const copy = copyUrl(cards, support);
+  return `${who ? `<div class="who">${esc(who)}</div>` : ""}
+    <div class="grid">${cards.map(slot).join("")}</div>
+    <div class="deck-foot">
+      ${tower?.iconUrls?.medium ? `<img class="tower" src="${esc(tower.iconUrls.medium)}" alt="${esc(tower.name || "")}" title="${esc(tower.name || "")}">` : ""}
+      ${avg ? `<span class="avg">${DROP} 平均 ${avg}</span>` : ""}
+      ${copy ? `<a class="copy" href="${esc(copy)}" target="_blank" rel="noopener">${COPY_ICON}コピー</a>` : ""}
+    </div>`;
+}
+
+function parseTime(raw) {
+  const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/.exec(raw || "");
+  return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6])) : null;
+}
+const fmtTime = (d) => d ? d.toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+
+function result(b, tag) {
+  const me = (b.team || []).find(x => clean(x.tag) === tag) || (b.team || [])[0] || {};
+  const op = (b.opponent || [])[0] || {};
+  const mc = me.crowns ?? 0, oc = op.crowns ?? 0;
+  return { me, op, mc, oc, r: mc > oc ? "win" : mc < oc ? "lose" : "draw" };
+}
+
+// ---- 画面 ----
+let current = null, opened = new Set();
+
+function render() {
+  if (!current) { $main.innerHTML = ""; return; }
+  if (current.loading) { $main.innerHTML = `<div class="notice">#${esc(current.tag)} を検索中…</div>`; return; }
+  if (current.error) { $main.innerHTML = `<div class="notice err">${esc(current.error)}</div>`; return; }
+
+  const { player: p, battles } = current.data;
+  const tag = clean(p.tag);
+  const pol = p.pol || {};
+  const league = pol.leagueNumber;
+  const tenkai = league === TENKAI && typeof pol.trophies === "number" && pol.trophies > 0;
+  const rank = (r) => typeof r === "number" && r > 0 ? `世界${r.toLocaleString()}位` : "順位なし";
+  const seasonChip = (label, s) => s && typeof s.trophies === "number" && s.trophies > 0
+    ? `<span class="s-chip"><i>${label}</i>${esc(s.trophies)}<small>${esc(rank(s.rank))}</small></span>` : "";
+
+  // 直近の対戦の成績
+  const decided = battles.map(b => result(b, tag)).filter(x => x.r !== "draw");
+  const wins = decided.filter(x => x.r === "win").length;
+  const ranked = battles.filter(b => b.type === "pathOfLegend").map(b => result(b, tag)).filter(x => x.r !== "draw");
+  const rWins = ranked.filter(x => x.r === "win").length;
+  const pct = (w, n) => n ? `${Math.round(w / n * 1000) / 10}<u>%</u>` : "—";
+  const total = (p.wins || 0) + (p.losses || 0);
+
+  const bouts = battles.map((b, i) => {
+    const { me, op, mc, oc, r } = result(b, tag);
+    const ch = me.trophyChange;
+    const partner = (b.team || []).length > 1 ? (b.team || []).find(x => clean(x.tag) !== tag) : null;
+    const isOpen = opened.has(i);
+    const mode = MODES[b.type] || b.mode || b.type || "";
+    return `<div class="bout ${r}">
+      <button class="bout-face" data-i="${i}" aria-expanded="${isOpen}">
+        <span class="verdict">${r === "win" ? "WIN" : r === "lose" ? "LOSE" : "DRAW"}</span>
+        <span class="bout-body">
+          <span class="bout-vs">vs ${esc(op.name || "?")}${(b.opponent || []).length > 1 ? ` & ${esc(b.opponent[1].name || "")}` : ""}</span>
+          <span class="bout-meta">${esc(mode)}${b.type === "pathOfLegend" && b.leagueNumber === TENKAI ? "(天界)" : ""} · ${esc(fmtTime(parseTime(b.battleTime)))}${
+            typeof ch === "number" && ch !== 0 ? ` · <span class="delta ${ch > 0 ? "up" : "down"}">${ch > 0 ? "+" + ch : ch}</span>` : ""}</span>
+        </span>
+        <span class="score">${mc}-${oc}</span>
+        <span class="chev">${isOpen ? "▲" : "▼"}</span>
+      </button>
+      ${isOpen ? `<div class="decks">
+        <div>${deckHtml(me.cards, me.supportCards, `${me.name || "自分"} のデッキ`)}</div>
+        ${partner ? `<div>${deckHtml(partner.cards, partner.supportCards, `${partner.name || "味方"} のデッキ`)}</div>` : ""}
+        ${(b.opponent || []).map(o => `<div>${deckHtml(o.cards, o.supportCards, `${o.name || "相手"} のデッキ`)}</div>`).join("")}
+      </div>` : ""}
+    </div>`;
+  }).join("");
+
+  $main.innerHTML = `
+    <div class="banner">
+      <div class="b-name">${esc(p.name)}</div>
+      <div class="b-tag">${esc(p.tag)} · キングLv${esc(p.expLevel ?? "?")}</div>
+      ${p.clan ? `<div class="b-clan">${esc(p.clan.name)}</div>` : ""}
+      ${(p.crl20Years || []).length ? `<div class="chips">${p.crl20Years.map(y => `<span class="c20">20勝達成(${esc(y)})</span>`).join("")}</div>` : ""}
+      ${LEAGUE_FILES[league] ? `<img class="b-shield" src="/assets/leagues/${LEAGUE_FILES[league]}" alt="">
+        <div class="b-league">${esc(LEAGUES[league] || "")}</div>` : ""}
+      ${tenkai
+        ? `<div class="plaque"><span>レート</span><b>${esc(pol.trophies)}</b></div>
+           ${pol.rank ? `<div class="b-foot">世界${esc(pol.rank.toLocaleString())}位</div>` : ""}`
+        : `<div class="plaque"><span>トロフィー</span><b>${esc(p.trophies ?? "—")}</b></div>`}
+      <div class="chips">${seasonChip("前シーズン", p.lastPol)}${seasonChip("最高シーズン", p.bestPol)}</div>
+      <div class="b-foot">トロフィー最高 ${esc(p.bestTrophies ?? "—")}${tenkai ? ` · 今のトロフィー ${esc(p.trophies ?? "—")}` : ""}</div>
+    </div>
+
+    <div class="tiles">
+      <div class="tile"><b>${esc((p.wins ?? 0).toLocaleString())}</b><small>通算勝利</small></div>
+      <div class="tile"><b>${pct(p.wins || 0, total)}</b><small>通算勝率</small></div>
+      <div class="tile"><b style="color:#8fd6ff">${pct(wins, decided.length)}</b><small>直近${battles.length}戦</small></div>
+      <div class="tile"><b style="color:var(--gold)">${pct(rWins, ranked.length)}</b><small>直近ランクマ</small></div>
+    </div>
+
+    <div class="sect"><span class="sect-title">今のデッキ</span><span class="sect-note">最後に対戦したときのデッキ</span></div>
+    <div class="deckbox">${deckHtml(p.deck, p.deckSupport)}</div>
+
+    <div class="sect"><span class="sect-title">直近の対戦</span><span class="sect-note">${battles.length}試合 · タップでデッキ</span></div>
+    ${bouts || `<div class="notice">対戦の記録がありません。</div>`}
+    <p class="hint">クラロワAPIで見られるのは直近25試合までです。データは数分ごとに新しくなります。</p>`;
+
+  $main.querySelectorAll(".bout-face").forEach(el => {
+    el.onclick = () => { const i = +el.dataset.i; opened.has(i) ? opened.delete(i) : opened.add(i); render(); };
+  });
+}
+
+async function search(raw) {
+  const tag = clean(raw);
+  if (!tag) return;
+  $("q").value = "#" + tag;
+  opened = new Set();
+  current = { tag, loading: true };
+  render();
+  try { window.history.replaceState(null, "", `/player/?tag=${tag}`); } catch {}
+  try {
+    const res = await fetch(`/api/public/player?tag=${encodeURIComponent(tag)}`);
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || "検索できませんでした");
+    current = { tag, data: body };
+    writeRecent([{ tag, name: body.player.name }, ...readRecent().filter(x => x.tag !== tag)]);
+    drawRecent();
+    $("refresh").hidden = false;
+  } catch (e) {
+    current = { tag, error: e.message || "検索できませんでした" };
+  }
+  render();
+}
+
+$("form").onsubmit = (e) => { e.preventDefault(); $("q").blur(); search($("q").value); };
+$("refresh").onclick = async () => {
+  if (!current?.tag) return;
+  $("refresh").classList.add("busy");
+  try { await search(current.tag); } finally { $("refresh").classList.remove("busy"); }
+};
+drawRecent();
+const first = new URLSearchParams(location.search).get("tag");
+if (first) search(first);
+</script>
+</body>
+</html>

@@ -49,6 +49,16 @@ jobs:
           out.append(f"Discordログイン: {st} redirect={q.get('redirect_uri')}")
           st, h, body = get(B + "/assets/icon-192.png"); out.append(f"画像: {st} {len(body)}バイト")
           st, h, body = get(B + "/sparky-view.js"); out.append(f"sparky-view.js: {st}")
+          st, h, body = get(B + "/titles.css"); out.append(f"titles.css: {st}")
+          st, h, body = get(B + "/decks/"); out.append(f"デッキランキング: {st}")
+          st, h, body = get(B + "/player/"); out.append(f"プレイヤー検索: {st}")
+          st, h, body = get("https://member.supaken.com/player/"); out.append(f"前のリンク(別ページ): {st} → {h.get('location')}")
+          st, h, body = get(B + "/api/public/player?tag=PRRRPLQGR")
+          try:
+              d = json.loads(body); out.append(f"検索API: {st} 名前={d['player']['name']} 対戦={len(d['battles'])} cache={h.get('cache-control')}")
+          except Exception:
+              out.append(f"検索API: {st} {body[:200]!r}")
+          st, h, body = get(B + "/api/public/player?tag=ZZZZ"); out.append(f"検索API(おかしなタグ): {st}")
           for line in out:
               print(line)
               print(f"::notice title=確認::{line}")
