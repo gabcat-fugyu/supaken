@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#07173a">
-<title>Clash Battle Log</title>
+<title>スパ研 メン限ページ</title>
 
 <meta name="apple-mobile-web-app-capable" content="yes">
 <!-- black-translucent だと時計やバッテリーの帯がページに重なって文字が読みにくい -->
@@ -596,7 +596,7 @@
 <body>
 <div class="wrap">
   <div class="masthead">
-    <span class="crest display" id="crest">CLASH BATTLE LOG</span>
+    <span class="crest display" id="crest">SUPAKEN LOG</span>
     <span class="masthead-btns">
       <a class="cr-btn icon" id="nav-home" href="/" aria-label="トップへ" title="トップへ">🏠</a>
       <button class="cr-btn icon" id="nav-sparky" aria-label="スパーキーランキング" title="スパーキーランキング">⚡</button>
@@ -659,7 +659,7 @@ const DISCORD_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.3
 function showAuth(reason) {
   view = "auth";
   $tabs.hidden = true; $back.hidden = true; $navSparky.hidden = true; $navProfile.hidden = true; $refresh.hidden = true;
-  $crest.textContent = "CLASH BATTLE LOG";
+  $crest.textContent = "SUPAKEN LOG";
   const msg = LOGIN_MESSAGES[reason] || "";
   $main.innerHTML = `<div class="auth">
     <h2>メンバー限定</h2>
@@ -1941,7 +1941,7 @@ function draw() {
   $navProfile.hidden = view !== "board";
   $navHome.hidden = view !== "board";
   $crest.textContent = view === "player" ? "PLAYER"
-    : view === "sparky" ? "SPARKY RANKING" : view === "profile" ? "PROFILE" : "CLASH BATTLE LOG";
+    : view === "sparky" ? "SPARKY RANKING" : view === "profile" ? "PROFILE" : "SUPAKEN LOG";
   drawTabs();
   if (view === "sparky") return;      // 中身は SparkyView が描く
   if (view === "profile") return drawProfile();
