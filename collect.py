@@ -830,10 +830,11 @@ def title_records(prev: dict, summary: dict, history, tag: str, badges) -> dict:
     # レートは天界にいるときだけ意味がある
     raw = summary.get("rawRating") if summary.get("rawLeagueNumber") == 7 else None
     rating = max(nums(raw, summary.get("bestRating"), summary.get("lastRating"), old.get("rating")) or [0])
-    ranks = [r for r in nums(summary.get("polRank"), summary.get("bestRank"), summary.get("lastRank"),
-                             old.get("rank")) if r > 0]
+    # 順位の称号は「シーズンが終わったときの順位」だけで決める(シーズン途中の順位は数えない)。
+    # 前シーズン・最高シーズンの最終順位と、これまでに記録した最終順位の一番いいもの
+    ranks = [r for r in nums(summary.get("bestRank"), summary.get("lastRank"), old.get("finishRank")) if r > 0]
     by_name = {str(b.get("name")): b for b in badges or []}
-    # 世界TOP1000に入った回数のバッジがあれば、1000位以内に入ったことがある
+    # 世界TOP1000でシーズンを終えた回数のバッジがあれば、1000位以内で終えたことがある
     if (by_name.get("LadderTop1000") or {}).get("progress", 0) >= 1:
         ranks.append(1000)
     prog = lambda n: (by_name.get(n) or {}).get("progress") or 0
@@ -845,7 +846,7 @@ def title_records(prev: dict, summary: dict, history, tag: str, badges) -> dict:
         "tenkai": 1 if tenkai else 0,
         "league": league,
         "rating": rating,
-        "rank": min(ranks) if ranks else None,
+        "finishRank": min(ranks) if ranks else None,
         "wins": max(nums(summary.get("wins"), old.get("wins")) or [0]),
         "streak": max(nums(best_win_streak(history, tag), old.get("streak")) or [0]),
         "classic": max(prog("Classic12Wins"), old.get("classic") or 0),
@@ -870,8 +871,12 @@ def earn_titles(prev_list, summary: dict, now) -> list:
         if (rec.get(key) or 0) >= need:
             add(tid)
     for tid, need in RANK_RULES:
-        if rec.get("rank") and rec["rank"] <= need:
+        if rec.get("finishRank") and rec["finishRank"] <= need:
             add(tid)
+        elif tid in have:
+            # 前はシーズン途中の順位でも付けていたので、最終順位で届いていないものは外す
+            have.pop(tid)
+            print(f"    🏅 {tid} を外しました(シーズン終了時の順位で判定し直し)")
     # 20勝チャレンジは年ごと(プロフィールのバッジと、今年のイベントの記録から)
     years = {c.get("year") for c in summary.get("pastChallenges") or []}
     years |= {a.get("year") for a in summary.get("achievements") or []}
