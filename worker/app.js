@@ -668,11 +668,15 @@ export async function writeRoster(env) {
 // ---- サイトの管理人: ユニーク称号 ----
 async function adminTitles(env) {
   const grants = (await env.DB.prepare(
-    `SELECT g.*, COALESCE(u.display_name, u.name) AS user_name FROM title_grants g
+    `SELECT g.*, COALESCE(u.display_name, '名無しさん') AS user_name FROM title_grants g
      JOIN app_users u ON u.id = g.discord_id ORDER BY g.id DESC`
   ).all()).results || [];
   const tagGrants = (await env.DB.prepare("SELECT * FROM tag_grants ORDER BY id DESC").all()).results || [];
-  const users = (await env.DB.prepare("SELECT id, COALESCE(display_name, name) AS name FROM app_users ORDER BY name").all()).results || [];
+  // 管理人にも Google の本名は出さない。表示名が無い人は、入っているグループで見分ける
+  const users = ((await env.DB.prepare(
+    `SELECT u.id, u.display_name, (SELECT group_concat(g.name, '・') FROM app_group_members m JOIN app_groups g ON g.id = m.group_id WHERE m.user_id = u.id) AS groups
+     FROM app_users u ORDER BY u.display_name IS NULL, u.display_name`
+  ).all()).results || []).map((u) => ({ id: u.id, name: u.display_name || `${NO_NAME}${u.groups ? `(${u.groups})` : ""}` }));
   return json({
     grants: [
       ...tagGrants.map((g) => ({ ...grantItem(g), id: "t" + g.id, tag: g.tag, userName: `#${g.tag}(まだ登録されていないアカウント)` })),
