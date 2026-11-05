@@ -228,7 +228,7 @@ function render() {
       <button class="face" data-tag="${esc(p.tag)}" aria-expanded="${isOpen}">
         <span class="medal">${i + 1}</span>
         <span class="body">
-          <span class="line"><span class="name">${esc(p.name)}</span>${p.a ? `<span class="ach">${T("20勝達成", "20 Wins")}</span>` : ""}${
+          <span class="line"><span class="name">${esc(p.name)}</span>${
             evoMostly ? (heroMostly ? `<span class="hero">${T("ヒーロー", "Hero")}</span>` : `<span class="evo">${T("進化", "Evo")}</span>`) : ""}</span>
           <span class="sub">${T(`使用率 ${use}%`, `Usage ${use}%`)}${wr != null ? ` · ${T("勝率", "Win")} ${wr}%` : ""} · ${
             T(`${esc(regionName(r))}${rank}位`, `${esc(regionName(r))} #${rank}`)}${p.clan ? ` · ${esc(p.clan)}` : ""}</span>
